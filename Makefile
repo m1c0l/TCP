@@ -1,27 +1,25 @@
 CXX=g++
-CXXOPTIMIZE= -O2
+CXXOPTIMIZE= -g
 CXXFLAGS= -g -Wall -pthread -std=c++11 $(CXXOPTIMIZE)
-USERID=EDIT_MAKE_FILE
+DISTDIR= CS118Project2
 
-# Add all .cpp files that need to be compiled for your server
-SERVER_FILES=server.cpp
-
-# Add all .cpp files that need to be compiled for your client
-CLIENT_FILES=client.cpp
+CLASSES = 
 
 all: server client
 
-*.o: *.cpp
-	$(CXX) -o $@ $^ $(CXXFLAGS) $@.cpp
+web-server: $(CLASSES:=.cpp) server.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
 
-server: $(SERVER_FILES:.cpp=.o)
-	$(CXX) -o $@ $(CXXFLAGS) $(SERVER_FILES:.cpp=.o)
+web-client: $(CLASSES:=.cpp) client.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
 
-client: $(CLIENT_FILES:.cpp=.o)
-	$(CXX) -o $@ $(CXXFLAGS) $(CLIENT_FILES:.cpp=.o)
+$(CLASSES:=.cpp): $(CLASSES:=.h)
 
 clean:
-	rm -rf *.o *~ *.gch *.swp *.dSYM server client *.tar.gz
+	rm -rf *.o *~ *.gch *.swp *.dSYM web-server web-client *.tar.gz $(DISTDIR)
 
-tarball: clean
-	tar -cvf $(USERID).tar.gz *
+dist: clean
+	tar cvf - --transform='s|^|$(DISTDIR)/|' *.cpp *.h *.pdf Makefile Vagrantfile | gzip -9 > $(DISTDIR).tar.gz
+
+.PHONY: clean dist
+
