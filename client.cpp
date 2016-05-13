@@ -2,8 +2,15 @@
 #include <thread>
 #include <iostream>
 
-int main()
+using namespace std;
+
+int main(int argc, char **argv)
 {
-  std::cerr << "web client is not implemented yet" << std::endl;
-  // do your stuff here! or not if you don't want to.
+	if (argc != 3) {
+		cerr << "usage: ./client SERVER-HOST-OR-IP PORT-NUMBER";
+		return 1;
+	}
+	string hostStr, port;
+	hostStr = argv[1];
+	port = argv[2];
 }
