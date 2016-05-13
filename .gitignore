@@ -1,5 +1,5 @@
 *.o
 *.dSYM
 .vagrant
-web-server
-web-client
+server
+client
