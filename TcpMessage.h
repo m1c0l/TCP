@@ -1,5 +1,5 @@
 #include <cstdint>
-
+#include <string>
 using namespace std;
 
 const uint8_t FIN_FLAG = 1;
@@ -14,6 +14,7 @@ struct TcpMessage {
 	uint8_t flags = 0;
 	uint8_t sourcePort = 0;
 	uint8_t destPort = 0;
+        string data;
 
 	bool setFlag(char flag);
 };
