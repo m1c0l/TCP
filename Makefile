@@ -3,14 +3,14 @@ CXXOPTIMIZE= -g
 CXXFLAGS= -g -Wall -pthread -std=c++11 $(CXXOPTIMIZE)
 DISTDIR= CS118Project2
 
-CLASSES = 
+CLASSES = TcpMessage
 
 all: server client
 
-web-server: $(CLASSES:=.cpp) server.cpp
+server: $(CLASSES:=.cpp) server.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-web-client: $(CLASSES:=.cpp) client.cpp
+client: $(CLASSES:=.cpp) client.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(CLASSES:=.cpp): $(CLASSES:=.h)
