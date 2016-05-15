@@ -1,6 +1,10 @@
 #include <string.h>
 #include <stdlib.h>
-#include <arpa.inet.h>;
+#include <sys/socket.h>
+#include <stdio.h>
+#include <fstream>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <thread>
 #include <iostream>
@@ -27,7 +31,7 @@ int main(int argc, char **argv) {
 	
 	//Timeout flags and stuff could be set here
 	int yes = 1;
-	if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yest, sizeof(int))== 1) {
+	if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))== 1) {
 	    perror("setsockopt");
 	    return 1;
 	}
@@ -45,15 +49,15 @@ int main(int argc, char **argv) {
 	}
 	int recv_length;
 	unsigned char buffer[BUFFER_SIZE];
-	int other_length = sizeof(other);
+	socklen_t other_length = sizeof(other);
 	while (true) {
 	  cout << "Waiting for something" << endl;
 	  recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &other, &other_length);
 	  cout << "Recieved packet from" << inet_ntoa(addr.sin_addr)<< ":" << ntohs(other.sin_port) << endl;
-	  cout << "Recieved:" <<buf<<endl;
+	  cout << "Recieved:" <<buffer<<endl;
 	  
-	  buf = "ACK";
-	  sendto(sockfd, buf, recv_len, 0, (struct sockaddr*) &other, , other_length)
+	  //buffer = "ACK";
+	  sendto(sockfd, buffer, recv_length, 0, (struct sockaddr*) &other, other_length);
 
 	}
 
