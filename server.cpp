@@ -16,7 +16,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
 	if (argc != 3) {
-		cerr << "usage: [PORT-NUMBER] [FILENAME]";
+		cerr << "usage: " << argv[0] << " PORT-NUMBER FILENAME" << '\n';
 		return 1;
 	}
 
@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
 	filename = argv[2]; 
 
 	//Create UDP socket
-	int sockfd = socket(AF_INET, SOCK_DGRAM,0);
+	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	
 	//Timeout flags and stuff could be set here
 	int yes = 1;

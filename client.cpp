@@ -1,51 +1,62 @@
-/*
-    Simple udp client
-    Silver Moon (m00n.silv3r@gmail.com)
-*/
-#include<stdio.h> //printf
-#include<string.h> //memset
-#include<stdlib.h> //exit(0);
-#include<arpa/inet.h>
-#include<sys/socket.h>
+#include <iostream>
+#include <string.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include <unistd.h>
+
+using namespace std;
  
-#define SERVER "10.0.0.1"
-#define BUFLEN 512  //Max length of buffer
-#define PORT 4000   //The port on which to send data
+#define BUFFER_SIZE 512  //Max length of buffer
  
-int main(void)
+int main(int argc, char **argv)
 {
+    if (argc != 3) {
+		cerr << "usage: " << argv[0] << " SERVER-HOST-OR-IP PORT-NUMBER" << '\n';
+        exit(1);
+    }
+
+    string ip = argv[1];
+    string port = argv[2];
+
     struct sockaddr_in si_other;
-    int s;
-    socklen_t slen=sizeof(si_other);
-    char message[BUFLEN];
  
-    if ( (s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-    {
-	    printf("inet_aton");
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd == -1) {
+        perror("socket");
 	    exit(1);
     }
  
     memset((char *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
-    si_other.sin_port = htons(PORT);
+    si_other.sin_port = htons(stoi(port));
      
-    if (inet_aton(SERVER , &si_other.sin_addr) == 0) 
-    {
-	    printf("inet_aton");
+    if (inet_aton(ip.c_str() , &si_other.sin_addr) == 0) {
+        perror("inet_aton");
 	    exit(1);
     }
  
-    strcpy(message, "asdf");
+    string message = "hello world";
 
-        //send the message
-        if (sendto(s, message, strlen(message) , 0 , (struct sockaddr *) &si_other, slen)==-1)
-        {
-	    printf("inet_aton");
-	    exit(1);
-        }
-         
+    //send the message
+    if (sendto(sockfd, message.c_str(), message.size(), 0,
+                (sockaddr*)&si_other, sizeof(si_other)) == -1) {
+        perror("sendto");
+        exit(1);
+    }
+
+    char buffer[BUFFER_SIZE];
+    socklen_t other_length = sizeof(si_other);
+
+    int recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
+            (sockaddr*)&si_other, &other_length);
+    if (recv_length == -1) {
+        perror("recvfrom");
+        exit(1);
+    }
+
+    cout.write(buffer, recv_length);
  
-    close(s);
+    close(sockfd);
     return 0;
 }
