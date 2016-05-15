@@ -16,7 +16,7 @@ client: $(CLASSES:=.cpp) client.cpp
 $(CLASSES:=.cpp): $(CLASSES:=.h)
 
 clean:
-	rm -rf *.o *~ *.gch *.swp *.dSYM web-server web-client *.tar.gz $(DISTDIR)
+	rm -rf *.o *~ *.gch *.swp *.dSYM server client *.tar.gz $(DISTDIR)
 
 dist: clean
 	tar cvf - --transform='s|^|$(DISTDIR)/|' *.cpp *.h *.pdf Makefile Vagrantfile | gzip -9 > $(DISTDIR).tar.gz
