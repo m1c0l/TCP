@@ -13,22 +13,17 @@
 #define BUFLEN 512  //Max length of buffer
 #define PORT 4000   //The port on which to send data
  
-void die(char *s)
-{
-    perror(s);
-    exit(1);
-}
- 
 int main(void)
 {
     struct sockaddr_in si_other;
     int s;
     socklen_t slen=sizeof(si_other);
-    char buf[BUFLEN];
     char message[BUFLEN];
  
     if ( (s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
     {
+	    printf("inet_aton");
+	    exit(1);
     }
  
     memset((char *) &si_other, 0, sizeof(si_other));
@@ -37,6 +32,8 @@ int main(void)
      
     if (inet_aton(SERVER , &si_other.sin_addr) == 0) 
     {
+	    printf("inet_aton");
+	    exit(1);
     }
  
     strcpy(message, "asdf");
@@ -44,17 +41,10 @@ int main(void)
         //send the message
         if (sendto(s, message, strlen(message) , 0 , (struct sockaddr *) &si_other, slen)==-1)
         {
+	    printf("inet_aton");
+	    exit(1);
         }
          
-        //receive a reply and print it
-        //clear the buffer by filling null, it might have previously received data
-        memset(buf,'\0', BUFLEN);
-        //try to receive some data, this is a blocking call
-        if (recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen) == -1)
-        {
-        }
-         
-        puts(buf);
  
     close(s);
     return 0;
