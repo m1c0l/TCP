@@ -5,19 +5,22 @@
 #include <fstream>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
+#include "TcpMessage.h"
+
 
 #include <thread>
 #include <iostream>
 #include <sys/socket.h>
 
-const int BUFFER_SIZE = 1024;
+const int BUFFER_SIZE = 1024;//Maybe 1032?
 
 using namespace std;
 
 int main(int argc, char **argv) {
 	if (argc != 3) {
-		cerr << "usage: " << argv[0] << " PORT-NUMBER FILENAME" << '\n';
-		return 1;
+	    cerr << "usage: " << argv[0] << " PORT-NUMBER FILENAME" << '\n';
+	    return 1;
 	}
 
 	string port, filename;
@@ -44,20 +47,44 @@ int main(int argc, char **argv) {
 	memset(addr.sin_zero, '\0', sizeof(addr.sin_zero));
        
 	if(bind(sockfd, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
-	  perror("bind");
-	  return 2;
+		perror("bind");
+		return 2;
 	}
 	int recv_length;
-	unsigned char buffer[BUFFER_SIZE];
+	char  buf[BUFFER_SIZE];
 	socklen_t other_length = sizeof(other);
+	struct TcpMessage recieved;
+        struct TcpMessage toSend;
+	srand (time(NULL)); //Used to generate random ISN
 	while (true) {
-	  cout << "Waiting for something" << endl;
-	  recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &other, &other_length);
-	  cout << "Recieved packet from" << inet_ntoa(addr.sin_addr)<< ":" << ntohs(other.sin_port) << endl;
-	  cout << "Recieved:" <<buffer<<endl;
-	  
-	  //buffer = "ACK";
-	  sendto(sockfd, buffer, recv_length, 0, (struct sockaddr*) &other, other_length);
+	    cout << "Waiting for something" << endl;
+	    recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (struct sockaddr *) &other, &other_length);//TODO: error checking
+
+	    //Obtain header from recieve
+	    recieved.bufferToMessage(buf, recv_length);       
+		     
+	    cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ":" << ntohs(other.sin_port) << endl;
+	    cout << "Recieved:" <<buf<<endl;
+        
+	    
+	    //Send SYN-ACK if client is trying to set up connection
+	    //Should put into a switch statement once I figure out all the packet cases
+	    //Buffer manipulation is untested right now, but it compiles ¯\_(ツ)_/¯
+	    if (SYN_FLAG | recieved.flags) {
+		toSend.ackNum = recieved.seqNum +1;
+		toSend.seqNum = rand() % 65536;
+		toSend.recvWindow = 1034;//Not sure about this number
+		toSend.setFlag("SA"); //SYN-ACK
+		toSend.sourcePort = recieved.destPort;
+		toSend.destPort = recieved.sourcePort;
+		
+		toSend.messageToBuffer(buf);
+
+		//Send SYN-ACK 
+		sendto(sockfd, buf, recv_length, 0, (struct sockaddr*) &other, other_length);
+	    }
+
+	    //	sendto(sockfd, buf, recv_length, 0, (struct sockaddr*) &other, other_length);
 
 	}
 
