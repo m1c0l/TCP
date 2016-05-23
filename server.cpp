@@ -13,7 +13,7 @@
 #include <iostream>
 #include <sys/socket.h>
 
-const int BUFFER_SIZE = 1024;//Maybe 1032?
+const int BUFFER_SIZE = 1024;//Maybe 1034?
 
 using namespace std;
 
@@ -63,22 +63,23 @@ int main(int argc, char **argv) {
 	    //Obtain header from recieve
 	    recieved.bufferToMessage(buf, recv_length);       
 		     
-	    cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ":" << ntohs(other.sin_port) << endl;
+	    cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 	    cout << "Recieved:" <<buf<<endl;
         
 	    
 	    //Send SYN-ACK if client is trying to set up connection
 	    //Should put into a switch statement once I figure out all the packet cases
 	    //Buffer manipulation is untested right now, but it compiles ¯\_(ツ)_/¯
-	    if (SYN_FLAG | recieved.flags) {
+	    if (SYN_FLAG & recieved.flags) {
 		toSend.ackNum = recieved.seqNum +1;
 		toSend.seqNum = rand() % 65536;
 		toSend.recvWindow = 1034;//Not sure about this number
 		toSend.setFlag("SA"); //SYN-ACK
-		toSend.sourcePort = recieved.destPort;
-		toSend.destPort = recieved.sourcePort;
+		//toSend.sourcePort = stoi(port);
+		//toSend.destPort = other.sin_port;
 		
 		toSend.messageToBuffer(buf);
+		
 
 		//Send SYN-ACK 
 		sendto(sockfd, buf, recv_length, 0, (struct sockaddr*) &other, other_length);

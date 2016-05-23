@@ -14,8 +14,8 @@ public:
 	//Maybe make reserved + flags into a uint16?
 	const uint8_t reserved = 0; // 8 bits that are empty in the header
 	uint8_t flags = 0;
-	uint8_t sourcePort = 0;
-	uint8_t destPort = 0;
+    //	uint8_t sourcePort = 0;
+    //uint8_t destPort = 0;
         string data = "";
 
 	bool setFlag(string flag);
