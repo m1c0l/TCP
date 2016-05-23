@@ -11,9 +11,7 @@ public:
 	uint16_t seqNum = 0;
 	uint16_t ackNum = 0;
         uint16_t recvWindow = 1034; //Double check this
-	//Maybe make reserved + flags into a uint16?
-	const uint8_t reserved = 0; // 8 bits that are empty in the header
-	uint8_t flags = 0;
+	uint16_t flags = 0;
     //	uint8_t sourcePort = 0;
     //uint8_t destPort = 0;
         string data = "";

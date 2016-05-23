@@ -13,7 +13,7 @@
 #include <iostream>
 #include <sys/socket.h>
 
-const int BUFFER_SIZE = 1024;//Maybe 1034?
+const int BUFFER_SIZE = 1032;//Maybe 1034?
 
 using namespace std;
 
@@ -61,8 +61,9 @@ int main(int argc, char **argv) {
 	    recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (struct sockaddr *) &other, &other_length);//TODO: error checking
 
 	    //Obtain header from recieve
-	    recieved.bufferToMessage(buf, recv_length);       
-		     
+	    //recieved.bufferToMessage(buf, recv_length);       
+	    memcpy((void *)&recieved, buf, recv_length);
+
 	    cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 	    cout << "Recieved:" <<buf<<endl;
         
@@ -78,8 +79,8 @@ int main(int argc, char **argv) {
 		//toSend.sourcePort = stoi(port);
 		//toSend.destPort = other.sin_port;
 		
-		toSend.messageToBuffer(buf);
-		
+		//toSend.messageToBuffer(buf);
+		memcpy(buf, (void *) &toSend, recv_length);
 
 		//Send SYN-ACK 
 		sendto(sockfd, buf, recv_length, 0, (struct sockaddr*) &other, other_length);

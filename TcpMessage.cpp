@@ -34,7 +34,7 @@ void TcpMessage::bufferToMessage(char* buf, int size){
     seqNum = ((buf[0] * 256) + buf[1]);
     ackNum = ((buf[2] * 256) + buf[3]);
     recvWindow = ((buf[4] * 256) + buf[5]);
-    flags =  buf[7];
+    flags =  buf[7] & 0xf;
     //sourcePort = buf[8];
     //    destPort = buf[9];
     //data.assign(buf+8, size-8);
@@ -57,9 +57,10 @@ void TcpMessage::messageToBuffer(char* b){
     b[7] = flags;
     //b[8] = sourcePort;
     //b[9] = destPort;
-    if (data != "")
-	data.copy(b, 1024, 8);
-    return;
+    
+    //if (data != "")
+    //	data.copy(b, 1024, 8);
+	//return;
     
 }
 

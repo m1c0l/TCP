@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "TcpMessage.h"
 
 using namespace std;
  
@@ -24,7 +25,7 @@ int main(int argc, char **argv)
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         perror("socket");
-	    exit(1);
+	exit(1);
     }
  
     memset((char *) &si_other, 0, sizeof(si_other));
@@ -36,10 +37,22 @@ int main(int argc, char **argv)
 	    exit(1);
     }
  
-    string message = "hello world";
+    //string message = "hello world";
+    
+    struct TcpMessage testSend;
+    testSend.seqNum = 3;
+    testSend.ackNum = 0;
+    testSend.recvWindow = 8;
+    testSend.setFlag("S");
 
+    char test[BUFFER_SIZE];
+    testSend.messageToBuffer(test);
+    //memcpy(test,(void*) &testSend, 8);
+    cout.write(test,8);
+    
     //send the message
-    if (sendto(sockfd, message.c_str(), message.size(), 0,
+    //size = messagesize+1 for null byte
+    if (sendto(sockfd, test, 8, 0,
                 (sockaddr*)&si_other, sizeof(si_other)) == -1) {
         perror("sendto");
         exit(1);
@@ -55,7 +68,8 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    cout.write(buffer, recv_length);
+    //cout.write(buffer, recv_length);
+    
  
     close(sockfd);
     return 0;
