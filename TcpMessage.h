@@ -10,13 +10,15 @@ struct TcpMessage {
 public:
 	uint16_t seqNum = 0;
 	uint16_t ackNum = 0;
-        uint16_t recvWindow = 1034; //Double check this
+	uint16_t recvWindow = 1034; //Double check this
 	uint16_t flags = 0;
-    //	uint8_t sourcePort = 0;
-    //uint8_t destPort = 0;
-        string data = "";
+	//	uint8_t sourcePort = 0;
+	//uint8_t destPort = 0;
+	string data = "";
 
 	bool setFlag(string flag);
-    void bufferToMessage(char* buf, int size);
-    void messageToBuffer(char* b);
+	bool getFlag(char flag);
+	void bufferToMessage(char* buf, int size);
+	void messageToBuffer(char* b);
+	void dump();
 };

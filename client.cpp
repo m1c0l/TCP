@@ -48,7 +48,8 @@ int main(int argc, char **argv)
     char test[BUFFER_SIZE];
     testSend.messageToBuffer(test);
     //memcpy(test,(void*) &testSend, 8);
-    cout.write(test,8);
+    cout << "sending:" << endl;
+    testSend.dump();
     
     //send the message
     //size = messagesize+1 for null byte
@@ -69,6 +70,11 @@ int main(int argc, char **argv)
     }
 
     //cout.write(buffer, recv_length);
+    //cout.flush();
+    struct TcpMessage received;
+    cout << "receiving:" << endl;
+    received.bufferToMessage(buffer, recv_length);
+    received.dump();
     
  
     close(sockfd);
