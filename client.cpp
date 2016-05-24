@@ -39,11 +39,7 @@ int main(int argc, char **argv)
  
     //string message = "hello world";
     
-    TcpMessage testSend;
-    testSend.seqNum = 3;
-    testSend.ackNum = 0;
-    testSend.recvWindow = 8;
-    testSend.setFlag("S");
+    TcpMessage testSend(rand() % 65536, 0, 1034, "S");
 
     char test[BUFFER_SIZE];
     testSend.messageToBuffer(test);

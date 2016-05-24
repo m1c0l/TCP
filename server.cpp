@@ -75,12 +75,7 @@ int main(int argc, char **argv) {
 		//Should put into a switch statement once I figure out all the packet cases
 		//Buffer manipulation is untested right now, but it compiles ¯\_(ツ)_/¯
 		if (SYN_FLAG & received.flags) {
-			toSend.ackNum = received.seqNum +1;
-			toSend.seqNum = rand() % 65536;
-			toSend.recvWindow = 1034;//Not sure about this number
-			toSend.setFlag("SA"); //SYN-ACK
-			//toSend.sourcePort = stoi(port);
-			//toSend.destPort = other.sin_port;
+			toSend = TcpMessage(rand() % 65536, received.seqNum + 1, 1034, "SA");
 
 			toSend.messageToBuffer(buf);
 			cout << "sending" << endl;
