@@ -25,7 +25,7 @@ int main(int argc, char **argv)
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
         perror("socket");
-	exit(1);
+		exit(1);
     }
  
     memset((char *) &si_other, 0, sizeof(si_other));
