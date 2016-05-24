@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <unistd.h>
 #include "TcpMessage.h"
 
 
@@ -90,5 +91,6 @@ int main(int argc, char **argv) {
 
 	}
 
+	close(sockfd);
 	return 0;
 }
