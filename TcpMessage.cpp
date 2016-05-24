@@ -3,7 +3,20 @@
 #include <iostream>
 #include <stdlib.h>
 
+using namespace std;
+
 const int BUFFER_SIZE = 1024;
+
+
+TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind,
+		string tcpFlags) {
+	seqNum = seq;
+	ackNum = ack;
+	recvWindow = recvWind;
+	setFlag(tcpFlags);
+}
+
+TcpMessage::TcpMessage() {}
 
 bool TcpMessage::setFlag(string flag) {
     for(size_t i = 0; i<flag.size(); i++){
@@ -91,4 +104,3 @@ void TcpMessage::dump() {
     cout << "ACK_FLAG = " << getFlag('a') << endl;
     cout << "data = \"" << data << "\"" << endl;
 }
-
