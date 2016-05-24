@@ -20,7 +20,7 @@ int main(int argc, char **argv)
     string ip = argv[1];
     string port = argv[2];
 
-    sockaddr_in si_other;
+	srand (time(NULL)); //Used to generate random ISN
  
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
@@ -28,6 +28,7 @@ int main(int argc, char **argv)
 		exit(1);
     }
  
+    sockaddr_in si_other;
     memset((char *) &si_other, 0, sizeof(si_other));
     si_other.sin_family = AF_INET;
     si_other.sin_port = htons(stoi(port));
@@ -37,13 +38,11 @@ int main(int argc, char **argv)
 	    exit(1);
     }
  
-    //string message = "hello world";
-    
     TcpMessage testSend(rand() % 65536, 0, 1034, "S");
 
     char test[BUFFER_SIZE];
     testSend.messageToBuffer(test);
-    //memcpy(test,(void*) &testSend, 8);
+
     cout << "sending:" << endl;
     testSend.dump();
     

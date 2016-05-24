@@ -24,14 +24,18 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	string port, filename;
-
 	//We probably need default values, not sure what they are yet.
-	port = argv[1];
-	filename = argv[2];
+	string port = argv[1];
+	string filename = argv[2];
+
+	srand (time(NULL)); //Used to generate random ISN
 
 	//Create UDP socket
 	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sockfd == -1) {
+		perror("socket");
+		return 1;
+	}
 
 	//Timeout flags and stuff could be set here
 	int yes = 1;
@@ -51,19 +55,22 @@ int main(int argc, char **argv) {
 		perror("bind");
 		return 2;
 	}
+
 	int recv_length;
 	char buf[BUFFER_SIZE];
 	socklen_t other_length = sizeof(other);
 	TcpMessage received;
 	TcpMessage toSend;
-	srand (time(NULL)); //Used to generate random ISN
+
 	while (true) {
 		cout << "Waiting for something" << endl;
-		recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length);//TODO: error checking
+		recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length);
+		if (recv_length == -1) {
+			perror("recvfrom");
+		}
 
 		//Obtain header from receive
 		received.bufferToMessage(buf, recv_length);
-		//memcpy((void *)&received, buf, recv_length);
 
 		cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cout << "Received:" << endl;
@@ -75,16 +82,18 @@ int main(int argc, char **argv) {
 		//Send SYN-ACK if client is trying to set up connection
 		//Should put into a switch statement once I figure out all the packet cases
 		//Buffer manipulation is untested right now, but it compiles ¯\_(ツ)_/¯
-		if (SYN_FLAG & received.flags) {
+		if (received.getFlag('s')) {
 			toSend = TcpMessage(rand() % 65536, received.seqNum + 1, 1034, "SA");
 
 			toSend.messageToBuffer(buf);
 			cout << "sending" << endl;
 			toSend.dump();
-			//memcpy(buf, (void *) &toSend, recv_length);
 
 			//Send SYN-ACK
-			sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
+			int send_length = sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
+			if (send_length == -1) {
+				perror("sendto");
+			}
 		}
 
 		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
