@@ -39,26 +39,26 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	struct sockaddr_in addr, other;
+	sockaddr_in addr, other;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(stoi(port));
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);//inet_addr("127.0.0.1");
 
 	memset(addr.sin_zero, '\0', sizeof(addr.sin_zero));
 
-	if(bind(sockfd, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
+	if(bind(sockfd, (sockaddr*) &addr, sizeof(addr)) == -1) {
 		perror("bind");
 		return 2;
 	}
 	int recv_length;
 	char buf[BUFFER_SIZE];
 	socklen_t other_length = sizeof(other);
-	struct TcpMessage received;
-	struct TcpMessage toSend;
+	TcpMessage received;
+	TcpMessage toSend;
 	srand (time(NULL)); //Used to generate random ISN
 	while (true) {
 		cout << "Waiting for something" << endl;
-		recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (struct sockaddr *) &other, &other_length);//TODO: error checking
+		recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length);//TODO: error checking
 
 		//Obtain header from receive
 		received.bufferToMessage(buf, recv_length);
@@ -88,10 +88,10 @@ int main(int argc, char **argv) {
 			//memcpy(buf, (void *) &toSend, recv_length);
 
 			//Send SYN-ACK
-			sendto(sockfd, buf, recv_length, 0, (struct sockaddr*) &other, other_length);
+			sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
 		}
 
-		//	sendto(sockfd, buf, recv_length, 0, (struct sockaddr*) &other, other_length);
+		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
 
 	}
 

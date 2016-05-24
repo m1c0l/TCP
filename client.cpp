@@ -20,7 +20,7 @@ int main(int argc, char **argv)
     string ip = argv[1];
     string port = argv[2];
 
-    struct sockaddr_in si_other;
+    sockaddr_in si_other;
  
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd == -1) {
@@ -39,7 +39,7 @@ int main(int argc, char **argv)
  
     //string message = "hello world";
     
-    struct TcpMessage testSend;
+    TcpMessage testSend;
     testSend.seqNum = 3;
     testSend.ackNum = 0;
     testSend.recvWindow = 8;
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 
     //cout.write(buffer, recv_length);
     //cout.flush();
-    struct TcpMessage received;
+    TcpMessage received;
     cout << "receiving:" << endl;
     received.bufferToMessage(buffer, recv_length);
     received.dump();
