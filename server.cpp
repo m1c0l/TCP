@@ -61,8 +61,11 @@ int main(int argc, char **argv) {
 	socklen_t other_length = sizeof(other);
 	TcpMessage received;
 	TcpMessage toSend;
+	bool hasReceivedSyn = false;
+	uint16_t synToSend = rand() % 65536;
+	uint16_t ackToSend;
 
-	while (true) {
+	for (int packetsSent = 0; packetsSent < 2; packetsSent++) {
 		cout << "Waiting for something" << endl;
 		recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length);
 		if (recv_length == -1) {
@@ -82,20 +85,50 @@ int main(int argc, char **argv) {
 		//Send SYN-ACK if client is trying to set up connection
 		//Should put into a switch statement once I figure out all the packet cases
 		//Buffer manipulation is untested right now, but it compiles ¯\_(ツ)_/¯
-		if (received.getFlag('s')) {
-			toSend = TcpMessage(rand() % 65536, received.seqNum + 1, 1034, "SA");
-
-			toSend.messageToBuffer(buf);
-			cout << "sending" << endl;
-			toSend.dump();
-
-			//Send SYN-ACK
-			int send_length = sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
-			if (send_length == -1) {
-				perror("sendto");
+		bool receivedSyn = received.getFlag('s');
+	    bool receivedAck = received.getFlag('a');
+		string flagsToSend = "";
+		if (receivedSyn && receivedAck) {
+			// error: both syn and ack were set by client
+			// TODO
+			cerr << "Both SYN and ACK were received!\n";
+			exit(1);
+		}
+		else if (receivedSyn) {
+			if (hasReceivedSyn) {
+				// error: shouldn't receive syn twice from client
+				// TODO
+				cerr << "SYN received again!\n";
+				exit(1);
 			}
+			flagsToSend = "SA";
+			hasReceivedSyn = true;
+		}
+		else if (receivedAck) {
+			if (!hasReceivedSyn) {
+				// error: ack before syn
+				// TODO
+				cerr << "ACK received before SYN!\n";
+				exit(1);
+			}
+			flagsToSend = "A";
 		}
 
+		if (packetsSent) {
+			synToSend = received.ackNum;
+		}
+		ackToSend = received.seqNum + 1;
+		toSend = TcpMessage(synToSend, ackToSend, 1034, flagsToSend);
+
+		toSend.messageToBuffer(buf);
+		cout << "sending" << endl;
+		toSend.dump();
+
+		//Send packets to client 
+		int send_length = sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
+		if (send_length == -1) {
+			perror("sendto");
+		}
 		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
 
 	}

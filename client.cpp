@@ -37,40 +37,60 @@ int main(int argc, char **argv)
         perror("inet_aton");
 	    exit(1);
     }
- 
-    TcpMessage testSend(rand() % 65536, 0, 1034, "S");
 
-    char test[BUFFER_SIZE];
-    testSend.messageToBuffer(test);
+	uint16_t synToSend = rand() % 65536;
+   	uint16_t ackToSend = 0;
+	for (int packetsSent = 0; packetsSent < 2; packetsSent++) {
+		string flagsToSend = "";
+ 		if (!packetsSent) {
+			flagsToSend = "S";
+		}
+		else {
+			flagsToSend = "A";
+		}
+		
+		TcpMessage testSend(synToSend, ackToSend, 1034, flagsToSend);
 
-    cout << "sending:" << endl;
-    testSend.dump();
-    
-    //send the message
-    //size = messagesize+1 for null byte
-    if (sendto(sockfd, test, 8, 0,
-                (sockaddr*)&si_other, sizeof(si_other)) == -1) {
-        perror("sendto");
-        exit(1);
-    }
+		char test[BUFFER_SIZE];
+		testSend.messageToBuffer(test);
 
-    char buffer[BUFFER_SIZE];
-    socklen_t other_length = sizeof(si_other);
+		cout << "sending:" << endl;
+		testSend.dump();
 
-    int recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
-            (sockaddr*)&si_other, &other_length);
-    if (recv_length == -1) {
-        perror("recvfrom");
-        exit(1);
-    }
+		//send the message
+		//size = messagesize+1 for null byte
+		if (sendto(sockfd, test, 8, 0,
+					(sockaddr*)&si_other, sizeof(si_other)) == -1) {
+			perror("sendto");
+			exit(1);
+		}
 
-    //cout.write(buffer, recv_length);
-    //cout.flush();
-    TcpMessage received;
-    cout << "receiving:" << endl;
-    received.bufferToMessage(buffer, recv_length);
-    received.dump();
-    
+		char buffer[BUFFER_SIZE];
+		socklen_t other_length = sizeof(si_other);
+
+		int recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
+				(sockaddr*)&si_other, &other_length);
+		if (recv_length == -1) {
+			perror("recvfrom");
+			exit(1);
+		}
+
+		//cout.write(buffer, recv_length);
+		//cout.flush();
+		TcpMessage received;
+		cout << "receiving:" << endl;
+		received.bufferToMessage(buffer, recv_length);
+		received.dump();
+		synToSend = received.ackNum;
+		ackToSend = received.seqNum + 1;
+
+		if (!packetsSent && (!received.getFlag('a') || !received.getFlag('s'))) {
+			// error: server responded, but without syn-ack
+			// TODO
+			cout << "Server responded, but without syn-ack!\n";
+			exit(1);
+		}
+	}
  
     close(sockfd);
     return 0;
