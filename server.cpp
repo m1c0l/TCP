@@ -8,6 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <fstream>
+#include <sys/stat.h>
 #include "TcpMessage.h"
 
 
@@ -65,14 +66,17 @@ int main(int argc, char **argv) {
 	TcpMessage received;
 	TcpMessage toSend;
 	bool hasReceivedSyn = false;
+	bool sendFile = false;
 	uint16_t seqToSend = rand() % 65536; //The first sync
 	uint16_t ackToSend;
-
-	for (int packetsSent = 0; true ; packetsSent++) {
-		cout << "Waiting for something" << endl;
-		if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length) == -1)) {
-			perror("recvfrom");
-		}
+	ifstream wantedFile;
+	int packs_to_send;
+	//	for (int packetsSent = 0; true ; packetsSent++) {
+	while (true){
+	    cout << "Waiting for something" << endl;
+	    if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
+		perror("recvfrom");
+	    }
 
 		//Obtain header from receive
 		received.bufferToMessage(buf, recv_length);
@@ -84,7 +88,7 @@ int main(int argc, char **argv) {
 
 		//Send SYN-ACK if client is trying to set up connection
 	      
-	     
+		
 		//bool receivedSyn = received.getFlag('s');
 		//bool receivedAck = received.getFlag('a');
 		string flagsToSend = "";
@@ -108,35 +112,37 @@ int main(int argc, char **argv) {
 			{cerr<< "ACK before handshake"; break;}
 		    flagsToSend = "A";
 		    //Time to start sending the file back
-		    //ifstream wantedFile;
-		    //wantedFile.open(filename);
-		    //	    if (!wantedFile){
-		    //	cerr<< "fstream open";
-			//}
+		    sendFile = true;
 		    
-
 		    break;
 		    
 		default:
 		    cerr << "Incorrect flags set";
 		    break;
 		}
+	      
 		//If not the first packet
-		if (packetsSent) { 
+		if (received.flags != SYN_FLAG) { 
 			seqToSend = received.ackNum;
-			data_inc = received.data.length() ? 1 : received.data.length();
-			    
+			data_inc = received.data.length() ? 1 : received.data.length();   
 		}
 		ackToSend = received.seqNum + data_inc;
 
 		toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
-
+		if (sendFile){
+		    char fileBuf[1024]; //OHGODMAGICNUMBAAAHHHHHH
+		    wantedFile.open(filename);
+		    if (!wantedFile){
+		 	cerr<< "fstream open";
+		    }
+		    
+		}
 		int msg_len = toSend.messageToBuffer(buf);
 		cout << "sending" << endl;
 		toSend.dump();
 
 		//Send packets to client 
-		if( (send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length) == -1)) {
+		if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
 			perror("sendto");
 		}
 		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
