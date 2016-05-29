@@ -28,69 +28,70 @@ int main(int argc, char **argv)
 		exit(1);
     }
  
-    sockaddr_in si_other;
-    memset((char *) &si_other, 0, sizeof(si_other));
-    si_other.sin_family = AF_INET;
-    si_other.sin_port = htons(stoi(port));
-     
-    if (inet_aton(ip.c_str() , &si_other.sin_addr) == 0) {
+    sockaddr_in si_server;
+    memset((char *) &si_server, 0, sizeof(si_server));
+    si_server.sin_family = AF_INET;
+    si_server.sin_port = htons(stoi(port));
+	socklen_t serverLen = sizeof(si_server);
+
+    if (inet_aton(ip.c_str() , &si_server.sin_addr) == 0) {
         perror("inet_aton");
 	    exit(1);
     }
 
+
 	uint16_t synToSend = rand() % 65536;
    	uint16_t ackToSend = 0;
-	for (int packetsSent = 0; packetsSent < 2; packetsSent++) {
-		string flagsToSend = "";
- 		if (!packetsSent) {
-			flagsToSend = "S";
-		}
-		else {
-			flagsToSend = "A";
-		}
-		
-		TcpMessage testSend(synToSend, ackToSend, 1034, flagsToSend);
+	uint16_t recvWindowToSend = 1034;
+	size_t msgLen;
+	char buffer[BUFFER_SIZE];
+	TcpMessage packetToSend;
 
-		char test[BUFFER_SIZE];
-		testSend.messageToBuffer(test);
 
-		cout << "sending:" << endl;
-		testSend.dump();
+	/* send SYN */
 
-		//send the message
-		//size = messagesize+1 for null byte
-		if (sendto(sockfd, test, 8, 0,
-					(sockaddr*)&si_other, sizeof(si_other)) == -1) {
-			perror("sendto");
-			exit(1);
-		}
-
-		char buffer[BUFFER_SIZE];
-		socklen_t other_length = sizeof(si_other);
-
-		int recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
-				(sockaddr*)&si_other, &other_length);
-		if (recv_length == -1) {
-			perror("recvfrom");
-			exit(1);
-		}
-
-		//cout.write(buffer, recv_length);
-		//cout.flush();
-		TcpMessage received;
-		cout << "receiving:" << endl;
-		received.bufferToMessage(buffer, recv_length);
-		received.dump();
-		synToSend = received.ackNum;
-		ackToSend = received.seqNum + 1;
-
-		if (!packetsSent && (!received.getFlag('a') || !received.getFlag('s'))) {
-			// error: server responded, but without syn-ack
-			// TODO
-			cout << "Server responded, but without syn-ack!\n";
-			exit(1);
-		}
+	packetToSend = TcpMessage(synToSend, ackToSend, recvWindowToSend, "S");
+	msgLen = packetToSend.messageToBuffer(buffer);
+	cout << "sending SYN:" << endl;
+	packetToSend.dump();
+	if (sendto(sockfd, buffer, msgLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
+		perror("sendto");
+		exit(1);
 	}
+
+
+	/* receive SYN-ACK */
+
+	int recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
+			(sockaddr*)&si_server, &serverLen);
+	if (recv_length == -1) {
+		perror("recvfrom");
+		exit(1);
+	}
+	TcpMessage received(buffer, recv_length);
+	cout << "receiving SYN-ACK:" << endl;
+	received.dump();
+	synToSend = received.ackNum;
+	ackToSend = received.seqNum + 1;
+	if (!received.getFlag('a') || !received.getFlag('s')) {
+		// error: server responded, but without syn-ack
+		// TODO
+		cout << "Server responded, but without syn-ack!\n";
+		exit(1);
+	}
+
+
+	/* send ACK */
+
+	packetToSend = TcpMessage(synToSend, ackToSend, recvWindowToSend, "A");
+	msgLen = packetToSend.messageToBuffer(buffer);
+	cout << "sending ACK:" << endl;
+	packetToSend.dump();
+	if (sendto(sockfd, buffer, msgLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
+		perror("sendto");
+		exit(1);
+	}
+
  
     close(sockfd);
     return 0;
