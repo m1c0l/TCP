@@ -40,17 +40,17 @@ int main(int argc, char **argv)
     }
 
 
-	uint16_t synToSend = rand() % 65536;
+	uint16_t seqToSend = rand() % 65536;
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = 1034;
 	size_t msgLen;
 	char buffer[BUFFER_SIZE];
-	TcpMessage packetToSend;
+	TcpMessage packetToSend, packetReceived;
 
 
 	/* send SYN */
 
-	packetToSend = TcpMessage(synToSend, ackToSend, recvWindowToSend, "S");
+	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "S");
 	msgLen = packetToSend.messageToBuffer(buffer);
 	cout << "sending SYN:" << endl;
 	packetToSend.dump();
@@ -68,12 +68,10 @@ int main(int argc, char **argv)
 		perror("recvfrom");
 		exit(1);
 	}
-	TcpMessage received(buffer, recv_length);
+	packetReceived = TcpMessage(buffer, recv_length);
 	cout << "receiving SYN-ACK:" << endl;
-	received.dump();
-	synToSend = received.ackNum;
-	ackToSend = received.seqNum + 1;
-	if (!received.getFlag('a') || !received.getFlag('s')) {
+	packetReceived.dump();
+	if (!packetReceived.getFlag('a') || !packetReceived.getFlag('s')) {
 		// error: server responded, but without syn-ack
 		// TODO
 		cout << "Server responded, but without syn-ack!\n";
@@ -83,7 +81,9 @@ int main(int argc, char **argv)
 
 	/* send ACK */
 
-	packetToSend = TcpMessage(synToSend, ackToSend, recvWindowToSend, "A");
+	seqToSend = packetReceived.ackNum;
+	ackToSend = packetReceived.seqNum + 1;
+	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
 	msgLen = packetToSend.messageToBuffer(buffer);
 	cout << "sending ACK:" << endl;
 	packetToSend.dump();
@@ -91,6 +91,35 @@ int main(int argc, char **argv)
 		perror("sendto");
 		exit(1);
 	}
+
+
+
+	do {
+		/* receive data */
+		recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
+				(sockaddr*)&si_server, &serverLen);
+		if (recv_length == -1) {
+			perror("recvfrom");
+			exit(1);
+		}
+		packetReceived = TcpMessage(buffer, recv_length);
+		cout << "receiving data:" << endl;
+		packetReceived.dump();
+
+
+		/* send ACK */
+
+		seqToSend = packetReceived.ackNum;
+		ackToSend = packetReceived.seqNum + packetReceived.data.size() + 1;
+		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
+		msgLen = packetToSend.messageToBuffer(buffer);
+		cout << "sending ACK:" << endl;
+		packetToSend.dump();
+		if (sendto(sockfd, buffer, msgLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
+			perror("sendto");
+			exit(1);
+		}
+	} while (packetReceived.getFlag('F') == false);
 
  
     close(sockfd);
