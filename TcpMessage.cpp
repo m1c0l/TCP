@@ -74,7 +74,7 @@ void TcpMessage::bufferToMessage(char* buf, int size){
 }
 
 //Solves the halting problem
-void TcpMessage::messageToBuffer(char* b){
+int TcpMessage::messageToBuffer(char* b){
     
     //Probably a better way to do this...
     b[0] = (seqNum >> 8) & 0xff;
@@ -91,7 +91,9 @@ void TcpMessage::messageToBuffer(char* b){
     //if (data != "")
     //	data.copy(b, 1024, 8);
 	//return;
-    
+
+	// 8 byte header + body
+	return 8 + data.size();
 }
 
 // Print out the TcpMessage's contents

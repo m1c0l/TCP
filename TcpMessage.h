@@ -22,6 +22,6 @@ public:
 	bool setFlag(string flag);
 	bool getFlag(char flag);
 	void bufferToMessage(char* buf, int size);
-	void messageToBuffer(char* b);
+	int messageToBuffer(char* b);
 	void dump();
 };
