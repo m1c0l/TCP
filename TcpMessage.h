@@ -18,6 +18,7 @@ public:
 	string data = "";
 
 	TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind, string tcpFlags);
+	TcpMessage(char *buf, int size);
 	TcpMessage();
 	bool setFlag(string flag);
 	bool getFlag(char flag);

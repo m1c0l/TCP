@@ -16,6 +16,10 @@ TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind,
 	setFlag(tcpFlags);
 }
 
+TcpMessage::TcpMessage(char *buf, int size) {
+	bufferToMessage(buf, size);
+}
+
 TcpMessage::TcpMessage() {}
 
 bool TcpMessage::setFlag(string flag) {
