@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
@@ -9,6 +10,8 @@
 using namespace std;
  
 #define BUFFER_SIZE 512  //Max length of buffer
+
+#define OUTPUT_FILE "client-dump" // the file received and saved by the client
  
 int main(int argc, char **argv)
 {
@@ -93,9 +96,12 @@ int main(int argc, char **argv)
 	}
 
 
+	/* receive data */
 
-	do {
-		/* receive data */
+	ofstream outFile(OUTPUT_FILE);
+
+	while (true) {
+		/* receive data packet */
 		recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
 				(sockaddr*)&si_server, &serverLen);
 		if (recv_length == -1) {
@@ -106,11 +112,20 @@ int main(int argc, char **argv)
 		cout << "receiving data:" << endl;
 		packetReceived.dump();
 
+		// FIN received
+		if (packetReceived.getFlag('F'))
+			break;
+
+		// save data to file
+		const char *data = packetReceived.data.c_str();
+		streamsize dataSize = packetReceived.data.size();
+		outFile.write(data, dataSize);
+
 
 		/* send ACK */
 
 		seqToSend = packetReceived.ackNum;
-		ackToSend = packetReceived.seqNum + packetReceived.data.size() + 1;
+		ackToSend = packetReceived.seqNum + dataSize + 1;
 		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
 		msgLen = packetToSend.messageToBuffer(buffer);
 		cout << "sending ACK:" << endl;
@@ -119,7 +134,8 @@ int main(int argc, char **argv)
 			perror("sendto");
 			exit(1);
 		}
-	} while (packetReceived.getFlag('F') == false);
+
+	}
 
  
     /* Receive FIN from server */ 
@@ -174,5 +190,6 @@ int main(int argc, char **argv)
 			exit(1);
 	}
 	close(sockfd);
-    return 0;
+	outFile.close();
+	return 0;
 }
