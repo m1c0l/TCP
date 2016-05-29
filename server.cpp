@@ -57,18 +57,19 @@ int main(int argc, char **argv) {
 	}
 
 	int recv_length;
+	int send_length;
+	int data_inc = 1; //How much to increase the seq number by
 	char buf[BUFFER_SIZE];
 	socklen_t other_length = sizeof(other);
 	TcpMessage received;
 	TcpMessage toSend;
 	bool hasReceivedSyn = false;
-	uint16_t synToSend = rand() % 65536;
+	uint16_t seqToSend = rand() % 65536; //The first sync
 	uint16_t ackToSend;
 
-	for (int packetsSent = 0; packetsSent < 2; packetsSent++) {
+	for (int packetsSent = 0; true ; packetsSent++) {
 		cout << "Waiting for something" << endl;
-		recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length);
-		if (recv_length == -1) {
+		if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length) == -1)) {
 			perror("recvfrom");
 		}
 
@@ -77,56 +78,56 @@ int main(int argc, char **argv) {
 
 		cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cout << "Received:" << endl;
-		//cout.write(buf, 8);
-		//cout << endl;
 		received.dump();
 
 
 		//Send SYN-ACK if client is trying to set up connection
-		//Should put into a switch statement once I figure out all the packet cases
-		//Buffer manipulation is untested right now, but it compiles ¯\_(ツ)_/¯
-		bool receivedSyn = received.getFlag('s');
-	    bool receivedAck = received.getFlag('a');
+	      
+	     
+		//bool receivedSyn = received.getFlag('s');
+		//bool receivedAck = received.getFlag('a');
 		string flagsToSend = "";
-		if (receivedSyn && receivedAck) {
-			// error: both syn and ack were set by client
-			// TODO
-			cerr << "Both SYN and ACK were received!\n";
-			exit(1);
-		}
-		else if (receivedSyn) {
-			if (hasReceivedSyn) {
-				// error: shouldn't receive syn twice from client
-				// TODO
-				cerr << "SYN received again!\n";
-				exit(1);
-			}
-			flagsToSend = "SA";
-			hasReceivedSyn = true;
-		}
-		else if (receivedAck) {
-			if (!hasReceivedSyn) {
-				// error: ack before syn
-				// TODO
-				cerr << "ACK received before SYN!\n";
-				exit(1);
-			}
-			flagsToSend = "A";
-		}
 
-		if (packetsSent) {
-			synToSend = received.ackNum;
+		switch(received.flags){
+		case SYN_FLAG:
+		    if (hasReceivedSyn)
+			{cerr <<"Multiple SYNs"; break;}
+		    hasReceivedSyn = true;
+		    flagsToSend ="SA";
+		   
+		    break;
+		
+		case SYN_FLAG | ACK_FLAG :
+		    cerr << "Both SYN and ACK were set by client";
+		    //exit(1);
+		    break;
+
+		case ACK_FLAG:
+		    if (!hasReceivedSyn)
+			{cerr<< "ACK before handshake"; break;}
+		    flagsToSend = "A";
+		    break;
+		    
+		default:
+		    cerr << "Incorrect flags set";
+		    break;
 		}
-		ackToSend = received.seqNum + 1;
-		toSend = TcpMessage(synToSend, ackToSend, 1034, flagsToSend);
+		//If not the first packet
+		if (packetsSent) { 
+			seqToSend = received.ackNum;
+			data_inc = received.data.length() ? 1 : received.data.length();
+			    
+		}
+		ackToSend = received.seqNum + data_inc;
+
+		toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 
 		toSend.messageToBuffer(buf);
 		cout << "sending" << endl;
 		toSend.dump();
 
 		//Send packets to client 
-		int send_length = sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
-		if (send_length == -1) {
+		if( (send_length = sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length) == -1)) {
 			perror("sendto");
 		}
 		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
