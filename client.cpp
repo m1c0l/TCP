@@ -122,6 +122,57 @@ int main(int argc, char **argv)
 	} while (packetReceived.getFlag('F') == false);
 
  
-    close(sockfd);
+    /* Receive FIN from server */ 
+	recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
+			(sockaddr*)&si_server, &serverLen);
+	if (recv_length == -1) {
+		perror("recvfrom");
+		exit(1);
+	}
+	packetReceived = TcpMessage(buffer, recv_length);
+	switch (packetReceived.flags) {
+		case FIN_FLAG:
+			//TODO: success
+			break;
+		default:
+			cerr << "FIN wasn't received from server!";
+			exit(1);
+	}
+
+	/* Send FIN-ACK */
+	seqToSend = packetReceived.ackNum;
+	ackToSend = packetReceived.seqNum + 1;
+	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
+	int hdrLen = packetToSend.messageToBuffer(buffer);
+	if (sendto(sockfd, buffer, hdrLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
+		perror("sendto");
+		exit(1);
+	}
+	
+	/* Send FIN */
+	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
+	hdrLen = packetToSend.messageToBuffer(buffer);
+	if (sendto(sockfd, buffer, hdrLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
+		perror("sendto");
+		exit(1);
+	}
+
+    /* Receive FIN-ACK from server */ 
+	recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
+			(sockaddr*)&si_server, &serverLen);
+	if (recv_length == -1) {
+		perror("recvfrom");
+		exit(1);
+	}
+	packetReceived = TcpMessage(buffer, recv_length);
+	switch (packetReceived.flags) {
+		case FIN_FLAG & ACK_FLAG:
+			//TODO: success
+			break;
+		default:
+			cerr << "FIN wasn't received from server!";
+			exit(1);
+	}
+	close(sockfd);
     return 0;
 }

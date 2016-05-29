@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
 	uint16_t ackToSend;
 	ifstream wantedFile;
 	int packs_to_send;
+	string flagsToSend = "";
 	//	for (int packetsSent = 0; true ; packetsSent++) {
 	while (true){
 	    cout << "Waiting for something" << endl;
@@ -91,7 +92,6 @@ int main(int argc, char **argv) {
 		
 		//bool receivedSyn = received.getFlag('s');
 		//bool receivedAck = received.getFlag('a');
-		string flagsToSend = "";
 
 		switch(received.flags){
 		case SYN_FLAG:
@@ -149,6 +149,58 @@ int main(int argc, char **argv) {
 
 	}
 
+	/* send FIN */
+
+	flagsToSend = "F";
+	seqToSend = received.ackNum;
+	/* This isn't needed since it's not valid anyways, but it makes it easier for client to send the same number back.*/
+	ackToSend = received.seqNum;
+	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
+	int hdrLen = toSend.messageToBuffer(buf);
+	if ((send_length = sendto(sockfd, buf, hdrLen, 0, (sockaddr*) &other, other_length)) == -1) {
+		perror("sendto");
+	}
+
+	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
+		perror("recvfrom");
+	}
+	/* Should receive FIN-ACK from client */
+	switch(received.flags) {
+		case FIN_FLAG | ACK_FLAG:
+			// TODO: success
+			break;
+		default:
+			cerr << "FIN-ACK wasn't received!";
+			exit(1);
+	}
+
+	/* Should receive FIN from client */
+	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
+		perror("recvfrom");
+	}
+	/* Should receive FIN-ACK from client */
+	switch(received.flags) {
+		case FIN_FLAG:
+			// TODO: success
+			break;
+		default:
+			cerr << "FIN wasn't received!";
+			exit(1);
+	}
+	flagsToSend = "FA";
+	seqToSend = received.ackNum;
+	ackToSend = received.seqNum;
+	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
+	hdrLen = toSend.messageToBuffer(buf);
+	if ((send_length = sendto(sockfd, buf, hdrLen, 0, (sockaddr*) &other, other_length)) == -1) {
+		perror("sendto");
+	}
+
+	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
+		perror("recvfrom");
+	}
+	/* TODO: shouldn't receive anything from client so deal with cases where client sends stuff */
+	
 	close(sockfd);
 	return 0;
 }
