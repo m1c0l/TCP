@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <time.h>
 #include <unistd.h>
+#include <fstream>
 #include "TcpMessage.h"
 
 
@@ -106,6 +107,14 @@ int main(int argc, char **argv) {
 		    if (!hasReceivedSyn)
 			{cerr<< "ACK before handshake"; break;}
 		    flagsToSend = "A";
+		    //Time to start sending the file back
+		    //ifstream wantedFile;
+		    //wantedFile.open(filename);
+		    //	    if (!wantedFile){
+		    //	cerr<< "fstream open";
+			//}
+		    
+
 		    break;
 		    
 		default:
@@ -122,12 +131,12 @@ int main(int argc, char **argv) {
 
 		toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 
-		toSend.messageToBuffer(buf);
+		int msg_len = toSend.messageToBuffer(buf);
 		cout << "sending" << endl;
 		toSend.dump();
 
 		//Send packets to client 
-		if( (send_length = sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length) == -1)) {
+		if( (send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length) == -1)) {
 			perror("sendto");
 		}
 		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
