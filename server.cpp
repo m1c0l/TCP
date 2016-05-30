@@ -16,7 +16,8 @@
 #include <iostream>
 #include <sys/socket.h>
 
-const int BUFFER_SIZE = 1032;//Maybe 1034?
+const int BUFFER_SIZE = 1032;
+const int DATA_SIZE = 1024;
 
 using namespace std;
 
@@ -70,8 +71,10 @@ int main(int argc, char **argv) {
 	uint16_t seqToSend = rand() % 65536; //The first sync
 	uint16_t ackToSend;
 	ifstream wantedFile;
-	int packs_to_send;
-	//	for (int packetsSent = 0; true ; packetsSent++) {
+	int packsToSend;
+	int pktSent = 0;
+	int msg_len; //Length of ultimate packet to send
+//	for (int packetsSent = 0; true ; packetsSent++) {
 	while (true){
 	    cout << "Waiting for something" << endl;
 	    if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
@@ -128,18 +131,53 @@ int main(int argc, char **argv) {
 		}
 		ackToSend = received.seqNum + data_inc;
 
-		toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
+		toSend = TcpMessage(seqToSend, ackToSend, BUFFER_SIZE, flagsToSend);
+
+	
 		if (sendFile){
-		    char fileBuf[1024]; //OHGODMAGICNUMBAAAHHHHHH
+		    char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
 		    wantedFile.open(filename);
 		    if (!wantedFile){
-		 	cerr<< "fstream open";
+		 	perror("fstream open");
 		    }
 		    
+		    off_t bodyLength = 0;
+		    struct stat st;
+		    if(stat(filename.c_str(), &st) == -1) {
+			perror("stat");
+		    } 
+		    bodyLength = st.st_size;
+		    packsToSend =( 1+ (( bodyLength -1)/DATA_SIZE));
+		    
+		   
+		    
+		    for (int  filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
+		    
+		    // while(wantedFile){
+			memset(filebuf, 0, DATA_SIZE);
+
+			//Read 1024 bytes normally, otherwise read the exact amount needed for the last packet
+			int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : 1024; 
+			wantedFile.read(filebuf, bytesToGet);
+			string temp(filebuf);
+			toSend.data = temp;
+			toSend.seqNum = ackToSend + filepkts*bytesToGet;
+			
+			msg_len = toSend.messageToBuffer(buf);
+
+			cout << "sending packet " << filepkts << " of file: "<< filename << endl;
+			if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
+			    perror("sendto");
+
+			}
+				
+			toSend.dump();
+			
+		    }
+		    continue;
 		}
-		int msg_len = toSend.messageToBuffer(buf);
-		cout << "sending" << endl;
-		toSend.dump();
+
+		
 
 		//Send packets to client 
 		if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
