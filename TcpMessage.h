@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 using namespace std;
 
 const uint16_t FIN_FLAG = 1;
@@ -23,7 +24,7 @@ public:
 	bool setFlag(string flag);
 	bool getFlag(char flag);
 	void bufferToMessage(uint8_t* buf, size_t size);
-	int messageToBuffer(uint8_t* b);
-	void sendto(int sockfd, sockaddr *si_other);
+	size_t messageToBuffer(uint8_t* b);
+	void sendto(int sockfd, sockaddr_in *si_other, socklen_t len);
 	void dump();
 };

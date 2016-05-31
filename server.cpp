@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
 	}
 
 	int recv_length;
-	int send_length;
 	int data_inc = 1; //How much to increase the seq number by
 	uint8_t buf[BUFFER_SIZE];
 	socklen_t other_length = sizeof(other);
@@ -73,7 +72,6 @@ int main(int argc, char **argv) {
 	ifstream wantedFile;
 	int packsToSend;
 	int pktSent = 0;
-	int msg_len; //Length of ultimate packet to send
 //	for (int packetsSent = 0; true ; packetsSent++) {
 	int packs_to_send;
 	string flagsToSend = "";
@@ -133,14 +131,10 @@ int main(int argc, char **argv) {
 		}
 		ackToSend = received.seqNum + data_inc;
 
+		//Send packets to client
 		toSend = TcpMessage(seqToSend, ackToSend, BUFFER_SIZE, flagsToSend);
+		toSend.sendto(sockfd, &other, other_length);
 
-		msg_len = toSend.messageToBuffer(buf);	
-		//Send packets to client 
-		if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
-			perror("sendto");
-		}
-		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
 		if (sendFile){
 		    char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
 		    wantedFile.open(filename);
@@ -169,15 +163,9 @@ int main(int argc, char **argv) {
 				toSend.data = temp;
 				toSend.seqNum = ackToSend + filepkts*bytesToGet;
 
-				msg_len = toSend.messageToBuffer(buf);
-
 				cout << "sending packet " << filepkts << " of file: "<< filename << endl;
-				if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
-					perror("sendto");
-
-				}
-
 				toSend.dump();
+				toSend.sendto(sockfd, &other, other_length);
 
 			}
 			break;
@@ -195,10 +183,7 @@ int main(int argc, char **argv) {
 	/* This isn't needed since it's not valid anyways, but it makes it easier for client to send the same number back.*/
 	ackToSend = received.seqNum;
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
-	int hdrLen = toSend.messageToBuffer(buf);
-	if ((send_length = sendto(sockfd, buf, hdrLen, 0, (sockaddr*) &other, other_length)) == -1) {
-		perror("sendto");
-	}
+	toSend.sendto(sockfd, &other, other_length);
 
 	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
 		perror("recvfrom");
@@ -230,10 +215,7 @@ int main(int argc, char **argv) {
 	seqToSend = received.ackNum;
 	ackToSend = received.seqNum;
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
-	hdrLen = toSend.messageToBuffer(buf);
-	if ((send_length = sendto(sockfd, buf, hdrLen, 0, (sockaddr*) &other, other_length)) == -1) {
-		perror("sendto");
-	}
+	toSend.sendto(sockfd, &other, other_length);
 
 	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
 		perror("recvfrom");

@@ -46,7 +46,6 @@ int main(int argc, char **argv)
 	uint16_t seqToSend = rand() % 65536;
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = 1034;
-	size_t msgLen;
 	uint8_t buffer[BUFFER_SIZE];
 	TcpMessage packetToSend, packetReceived;
 
@@ -54,13 +53,9 @@ int main(int argc, char **argv)
 	/* send SYN */
 
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "S");
-	msgLen = packetToSend.messageToBuffer(buffer);
-	cout << "sending SYN:" << endl;
+	cout << "sending ACK:" << endl;
 	packetToSend.dump();
-	if (sendto(sockfd, buffer, msgLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
-		perror("sendto");
-		exit(1);
-	}
+	packetToSend.sendto(sockfd, &si_server, serverLen);
 
 
 	/* receive SYN-ACK */
@@ -87,13 +82,9 @@ int main(int argc, char **argv)
 	seqToSend = packetReceived.ackNum;
 	ackToSend = packetReceived.seqNum + 1;
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-	msgLen = packetToSend.messageToBuffer(buffer);
 	cout << "sending ACK:" << endl;
 	packetToSend.dump();
-	if (sendto(sockfd, buffer, msgLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
-		perror("sendto");
-		exit(1);
-	}
+	packetToSend.sendto(sockfd, &si_server, serverLen);
 
 
 	/* receive data */
@@ -127,13 +118,9 @@ int main(int argc, char **argv)
 		seqToSend = packetReceived.ackNum;
 		ackToSend = packetReceived.seqNum + dataSize + 1;
 		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-		msgLen = packetToSend.messageToBuffer(buffer);
 		cout << "sending ACK:" << endl;
 		packetToSend.dump();
-		if (sendto(sockfd, buffer, msgLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
-			perror("sendto");
-			exit(1);
-		}
+		packetToSend.sendto(sockfd, &si_server, serverLen);
 
 	}
 
@@ -159,19 +146,11 @@ int main(int argc, char **argv)
 	seqToSend = packetReceived.ackNum;
 	ackToSend = packetReceived.seqNum + 1;
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
-	int hdrLen = packetToSend.messageToBuffer(buffer);
-	if (sendto(sockfd, buffer, hdrLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
-		perror("sendto");
-		exit(1);
-	}
+	packetToSend.sendto(sockfd, &si_server, serverLen);
 	
 	/* Send FIN */
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
-	hdrLen = packetToSend.messageToBuffer(buffer);
-	if (sendto(sockfd, buffer, hdrLen, 0, (sockaddr*)&si_server, serverLen) == -1) {
-		perror("sendto");
-		exit(1);
-	}
+	packetToSend.sendto(sockfd, &si_server, serverLen);
 
     /* Receive FIN-ACK from server */ 
 	recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,

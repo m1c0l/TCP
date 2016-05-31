@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 using namespace std;
 
@@ -78,7 +80,7 @@ void TcpMessage::bufferToMessage(uint8_t* buf, size_t size){
 }
 
 //Solves the halting problem
-int TcpMessage::messageToBuffer(uint8_t* b){
+size_t TcpMessage::messageToBuffer(uint8_t* b) {
     
     //Probably a better way to do this...
     b[0] = (seqNum >> 8) & 0xff;
@@ -98,6 +100,15 @@ int TcpMessage::messageToBuffer(uint8_t* b){
 
 	// 8 byte header + body
 	return 8 + data.size();
+}
+
+void TcpMessage::sendto(int sockfd, sockaddr_in *si_other, socklen_t len) {
+	uint8_t buf[BUFFER_SIZE];
+	size_t msgLen = messageToBuffer(buf);
+	if (::sendto(sockfd, buf, msgLen, 0, (sockaddr*)si_other, len) == -1) {
+		perror("sendto");
+		exit(1);
+	}
 }
 
 // Print out the TcpMessage's contents
