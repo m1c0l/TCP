@@ -120,6 +120,7 @@ int main(int argc, char **argv) {
 	wantedFile.open(filename);
 	if (!wantedFile){
 		perror("fstream open");
+		exit(1);
 	}
 
 	off_t bodyLength = 0;
