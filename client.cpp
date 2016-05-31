@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 	/* send SYN */
 
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "S");
-	cout << "sending ACK:" << endl;
+	cout << "sending SYN:" << endl;
 	packetToSend.dump();
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
 
  
     /* Receive FIN from server */ 
-	packetReceived.recvfrom(sockfd, &si_server, serverLen);
+	/*packetReceived.recvfrom(sockfd, &si_server, serverLen);
 	switch (packetReceived.flags) {
 		case FIN_FLAG:
 			//TODO: success
@@ -121,28 +121,34 @@ int main(int argc, char **argv)
 		default:
 			cerr << "FIN wasn't received from server!";
 			exit(1);
-	}
+	}*/
 
 	/* Send FIN-ACK */
 	seqToSend = packetReceived.ackNum;
 	ackToSend = packetReceived.seqNum + 1;
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
+	cout << "Sending FIN-ACK to server\n";
+	packetToSend.dump();
 	
 	/* Send FIN */
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
+	cout << "Sending FIN to server\n";
+	packetToSend.dump();
 
     /* Receive FIN-ACK from server */ 
 	packetReceived.recvfrom(sockfd, &si_server, serverLen);
 	switch (packetReceived.flags) {
-		case FIN_FLAG & ACK_FLAG:
+		case FIN_FLAG | ACK_FLAG:
 			//TODO: success
+			cout << "Received FIN-ACK from server\n";
 			break;
 		default:
-			cerr << "FIN wasn't received from server!";
+			cerr << "FIN-ACK wasn't received from server!\n";
 			exit(1);
 	}
+	packetReceived.dump();
 	close(sockfd);
 	outFile.close();
 	return 0;

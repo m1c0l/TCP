@@ -182,35 +182,45 @@ int main(int argc, char **argv) {
 	ackToSend = received.seqNum;
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
+	cout << "Sending FIN\n";
+	toSend.dump();
 
 	/* Should receive FIN-ACK from client */
 	received.recvfrom(sockfd, &other, other_length);
 	switch(received.flags) {
 		case FIN_FLAG | ACK_FLAG:
 			// TODO: success
+			cout << "Received FIN-ACK\n";
 			break;
 		default:
-			cerr << "FIN-ACK wasn't received!";
-			exit(1);
+			cerr << "FIN-ACK wasn't received!\n";
+			//exit(1);
 	}
+	received.dump();
 
 	/* Should receive FIN from client */
 	received.recvfrom(sockfd, &other, other_length);
 	switch(received.flags) {
 		case FIN_FLAG:
 			// TODO: success
+			cout << "Received FIN\n";
 			break;
 		default:
-			cerr << "FIN wasn't received!";
-			exit(1);
+			cerr << "FIN wasn't received!\n";
+			//exit(1);
 	}
+	received.dump();
+
 	flagsToSend = "FA";
 	seqToSend = received.ackNum;
 	ackToSend = received.seqNum;
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
+	cout << "Sending FIN-ACK\n";
+	toSend.dump();
 
-	received.recvfrom(sockfd, &other, other_length);
+	cout << "Shouldn't receive anything else from client now\n";
+	//received.recvfrom(sockfd, &other, other_length);
 	/* TODO: shouldn't receive anything from client so deal with cases where client sends stuff */
 	
 	close(sockfd);
