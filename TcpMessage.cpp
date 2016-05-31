@@ -108,11 +108,12 @@ void TcpMessage::recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len) {
 
 // Print out the TcpMessage's contents
 void TcpMessage::dump() {
-    cout << "seqNum = " << seqNum << endl;
-    cout << "ackNum = " << ackNum << endl;
+    cout << "seqNum = " << seqNum << '\t';
+    cout << "ackNum = " << ackNum << '\t';
     cout << "recvWindow = " << recvWindow << endl;
-    cout << "FIN_FLAG = " << getFlag('f') << endl;
-    cout << "SYN_FLAG = " << getFlag('s') << endl;
+    cout << "FIN_FLAG = " << getFlag('f') << '\t';
+    cout << "SYN_FLAG = " << getFlag('s') << '\t';
     cout << "ACK_FLAG = " << getFlag('a') << endl;
     cout << "data = \"" << data << "\"" << endl;
+    cout << endl;
 }
