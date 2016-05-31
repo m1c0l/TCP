@@ -135,7 +135,12 @@ int main(int argc, char **argv) {
 
 		toSend = TcpMessage(seqToSend, ackToSend, BUFFER_SIZE, flagsToSend);
 
-	
+		msg_len = toSend.messageToBuffer(buf);	
+		//Send packets to client 
+		if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
+			perror("sendto");
+		}
+		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
 		if (sendFile){
 		    char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
 		    wantedFile.open(filename);
@@ -153,39 +158,33 @@ int main(int argc, char **argv) {
 		    
 		   
 		    
-		    for (int  filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
-		    
-		    // while(wantedFile){
-			memset(filebuf, 0, DATA_SIZE);
+			for (int  filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
 
-			//Read 1024 bytes normally, otherwise read the exact amount needed for the last packet
-			int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : 1024; 
-			wantedFile.read(filebuf, bytesToGet);
-			string temp(filebuf);
-			toSend.data = temp;
-			toSend.seqNum = ackToSend + filepkts*bytesToGet;
-			
-			msg_len = toSend.messageToBuffer(buf);
+				memset(filebuf, 0, DATA_SIZE);
 
-			cout << "sending packet " << filepkts << " of file: "<< filename << endl;
-			if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
-			    perror("sendto");
+				//Read 1024 bytes normally, otherwise read the exact amount needed for the last packet
+				int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : 1024; 
+				wantedFile.read(filebuf, bytesToGet);
+				string temp(filebuf);
+				toSend.data = temp;
+				toSend.seqNum = ackToSend + filepkts*bytesToGet;
+
+				msg_len = toSend.messageToBuffer(buf);
+
+				cout << "sending packet " << filepkts << " of file: "<< filename << endl;
+				if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
+					perror("sendto");
+
+				}
+
+				toSend.dump();
 
 			}
-				
-			toSend.dump();
-			
-		    }
-		    continue;
+			break;
 		}
 
 		
 
-		//Send packets to client 
-		if((send_length = sendto(sockfd, buf, msg_len, 0, (sockaddr*) &other, other_length)) == -1) {
-			perror("sendto");
-		}
-		//	sendto(sockfd, buf, recv_length, 0, (sockaddr*) &other, other_length);
 
 	}
 
