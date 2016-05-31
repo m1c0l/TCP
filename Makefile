@@ -15,11 +15,13 @@ client: $(CLASSES:=.cpp) client.cpp
 
 $(CLASSES:=.cpp): $(CLASSES:=.h)
 
+test: clean all
+	./test.sh
+
 clean:
 	rm -rf *.o *~ *.gch *.swp *.dSYM server client *.tar.gz $(DISTDIR)
 
 dist: clean
 	tar cvf - --transform='s|^|$(DISTDIR)/|' *.cpp *.h *.pdf Makefile Vagrantfile | gzip -9 > $(DISTDIR).tar.gz
 
-.PHONY: clean dist
-
+.PHONY: test clean dist
