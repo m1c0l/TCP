@@ -1,3 +1,6 @@
+#ifndef TCPMESSAGE_H
+#define TCPMESSAGE_H
+
 #include <cstdint>
 #include <string>
 #include <sys/socket.h>
@@ -28,3 +31,5 @@ public:
 	void sendto(int sockfd, sockaddr_in *si_other, socklen_t len);
 	void dump();
 };
+
+#endif /* TCPMESSAGE_H */
