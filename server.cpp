@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
 		//Read 1024 bytes normally, otherwise read the exact amount needed for the last packet
 		int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : 1024; 
 		wantedFile.read(filebuf, bytesToGet);
-		string temp(filebuf);
+		string temp(filebuf, bytesToGet);
 		toSend.data = temp;
 		if (filepkts) {
 			toSend.seqNum = ackToSend + filepkts*bytesToGet;
