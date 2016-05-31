@@ -65,16 +65,13 @@ int main(int argc, char **argv) {
 	TcpMessage toSend;
 	bool hasReceivedSyn = false;
 	bool sendFile = false;
-	uint16_t seqToSend = rand() % 65536; //The first sync
+	uint16_t seqToSend = rand() % 0xffff; //The first sync
 	uint16_t ackToSend;
 	ifstream wantedFile;
 	int packsToSend;
 	int pktSent = 0;
-//	for (int packetsSent = 0; true ; packetsSent++) {
-//	int packs_to_send;
 	string flagsToSend = "";
-	//	for (int packetsSent = 0; true ; packetsSent++) {
-	while (true){
+	for (int packetsSent = 0; true; packetsSent++) {
 	    cout << "Waiting for something" << endl;
 		received.recvfrom(sockfd, &other, other_length);
 
@@ -85,10 +82,6 @@ int main(int argc, char **argv) {
 
 		//Send SYN-ACK if client is trying to set up connection
 	      
-		
-		//bool receivedSyn = received.getFlag('s');
-		//bool receivedAck = received.getFlag('a');
-
 		switch(received.flags){
 		case SYN_FLAG:
 		    if (hasReceivedSyn)
@@ -116,57 +109,69 @@ int main(int argc, char **argv) {
 		    cerr << "Incorrect flags set";
 		    break;
 		}
-	      
-		//If not the first packet
-		if (received.flags != SYN_FLAG) { 
-			seqToSend = received.ackNum;
-			data_inc = received.data.length() ? 1 : received.data.length();   
-		}
-		ackToSend = received.seqNum + data_inc;
 
-		//Send packets to client
+		// if we're done handshake and are ready to send the file now
+		if (sendFile) {
+			break;
+		}	      
+
+		ackToSend = received.seqNum + 1;
 		toSend = TcpMessage(seqToSend, ackToSend, BUFFER_SIZE, flagsToSend);
 		toSend.sendto(sockfd, &other, other_length);
+		cout << "Handshake: sending packet\n";
+		toSend.dump();
+	}
+	
+	seqToSend = received.ackNum;
+	data_inc = received.data.length() ? 1 : received.data.length();   
+	ackToSend = received.seqNum + data_inc;
+	char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
+	wantedFile.open(filename);
+	if (!wantedFile){
+		perror("fstream open");
+	}
 
-		if (sendFile){
-		    char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
-		    wantedFile.open(filename);
-		    if (!wantedFile){
-		 	perror("fstream open");
-		    }
-		    
-		    off_t bodyLength = 0;
-		    struct stat st;
-		    if(stat(filename.c_str(), &st) == -1) {
-			perror("stat");
-		    } 
-		    bodyLength = st.st_size;
-		    packsToSend =( 1+ (( bodyLength -1)/DATA_SIZE));
-		    
-		   
-		    
-			for (int  filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
+	off_t bodyLength = 0;
+	struct stat st; // of course C names a class and function the same thing...
+	if(stat(filename.c_str(), &st) == -1) {
+		perror("stat");
+	} 
+	bodyLength = st.st_size;
+	packsToSend = ( 1+ (( bodyLength -1)/DATA_SIZE));
 
-				memset(filebuf, 0, DATA_SIZE);
 
-				//Read 1024 bytes normally, otherwise read the exact amount needed for the last packet
-				int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : 1024; 
-				wantedFile.read(filebuf, bytesToGet);
-				string temp(filebuf);
-				toSend.data = temp;
-				toSend.seqNum = ackToSend + filepkts*bytesToGet;
 
-				cout << "sending packet " << filepkts << " of file: "<< filename << endl;
-				toSend.sendto(sockfd, &other, other_length);
-				toSend.dump();
+	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
 
-			}
-			break;
+		memset(filebuf, 0, DATA_SIZE);
+
+		//Read 1024 bytes normally, otherwise read the exact amount needed for the last packet
+		int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : 1024; 
+		wantedFile.read(filebuf, bytesToGet);
+		string temp(filebuf);
+		toSend.data = temp;
+		if (filepkts) {
+			toSend.seqNum = ackToSend + filepkts*bytesToGet;
 		}
 
-		
+		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
+		toSend.dump();
+		toSend.sendto(sockfd, &other, other_length);
 
+	}
 
+	for (int filepkts = 0; filepkts < packsToSend; filepkts++) {
+		received.recvfrom(sockfd, &other, other_length);
+		// receive ack for data
+		cout << "Received ack for data:\n";
+		received.dump();
+		switch (received.flags) {
+			case ACK_FLAG:
+				// success
+				break;
+			default:
+				cerr << "ACK not received!";
+		}
 	}
 
 	/* send FIN */
