@@ -116,10 +116,7 @@ int main(int argc, char **argv) {
 		toSend.dump();
 	}
 	
-	seqToSend = received.ackNum;
-	data_inc = received.data.length() ? 1 : received.data.length();   
-	ackToSend = received.seqNum + data_inc;
-	char filebuf[DATA_SIZE];
+	char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
 	wantedFile.open(filename);
 	if (!wantedFile){
 		perror("fstream open");
@@ -133,7 +130,14 @@ int main(int argc, char **argv) {
 	bodyLength = st.st_size;
 	packsToSend = ( 1+ (( bodyLength -1)/DATA_SIZE));
 
-
+	// if the client sent data, increment ack by that number
+	size_t recvLength = received.data.length();
+	if (recvLength) {
+		data_inc = recvLength;
+	}	
+	ackToSend = received.seqNum + data_inc;
+	// increment our sequence number by 1
+	seqToSend++; 
 
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
 
@@ -144,14 +148,14 @@ int main(int argc, char **argv) {
 		wantedFile.read(filebuf, bytesToGet);
 		string temp(filebuf, bytesToGet);
 		toSend.data = temp;
-		if (filepkts) {
-			toSend.seqNum = ackToSend + filepkts*bytesToGet;
-		}
+		toSend = TcpMessage(seqToSend, ackToSend, 1034, "A");
 
 		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
 		toSend.dump();
 		toSend.sendto(sockfd, &other, other_length);
 
+		// Increase sequence number to send next time by number of bytes sent
+		seqToSend += bytesToGet;
 	}
 
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++) {
@@ -171,9 +175,10 @@ int main(int argc, char **argv) {
 	/* send FIN */
 
 	flagsToSend = "F";
-	seqToSend = received.ackNum;
-	/* This isn't needed since it's not valid anyways, but it makes it easier for client to send the same number back.*/
-	ackToSend = received.seqNum;
+	// Sequence number shouldn't change since we already increased by total data size
+	//seqToSend = received.ackNum;
+	//ackToSend = received.seqNum;
+	ackToSend = 0; // ACK is invalid this packet
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
 	cout << "Sending FIN\n";
@@ -206,7 +211,7 @@ int main(int argc, char **argv) {
 	received.dump();
 
 	flagsToSend = "FA";
-	seqToSend = received.ackNum;
+	seqToSend++;// increase sequence number by 1
 	ackToSend = received.seqNum;
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);

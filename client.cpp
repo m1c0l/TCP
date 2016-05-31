@@ -64,13 +64,13 @@ int main(int argc, char **argv)
 		// error: server responded, but without syn-ack
 		// TODO
 		cout << "Server responded, but without syn-ack!\n";
-		exit(1);
+		//exit(1);
 	}
 
 
 	/* send ACK */
 
-	seqToSend = packetReceived.ackNum;
+	seqToSend++;// increase sequence number by 1
 	ackToSend = packetReceived.seqNum + 1;
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
 	cout << "sending ACK:" << endl;
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 		/* send ACK */
 
 		seqToSend = packetReceived.ackNum;
-		ackToSend = packetReceived.seqNum + dataSize + 1;
+		ackToSend = packetReceived.seqNum + dataSize;
 		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
 		cout << "sending ACK:" << endl;
 		packetToSend.dump();
@@ -122,8 +122,8 @@ int main(int argc, char **argv)
 	}*/
 
 	/* Send FIN-ACK */
-	seqToSend = packetReceived.ackNum;
-	ackToSend = packetReceived.seqNum + 1;
+	seqToSend++;
+	acktosend = packetreceived.seqnum + 1;
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 	cout << "Sending FIN-ACK to server\n";
