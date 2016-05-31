@@ -16,7 +16,7 @@ TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind,
 	setFlag(tcpFlags);
 }
 
-TcpMessage::TcpMessage(char *buf, int size) {
+TcpMessage::TcpMessage(uint8_t *buf, size_t size) {
 	bufferToMessage(buf, size);
 }
 
@@ -63,7 +63,7 @@ bool TcpMessage::getFlag(char flag) {
 }
 
 //Converts a char buffer from recvfrom into a TcpMessage object
-void TcpMessage::bufferToMessage(char* buf, int size){
+void TcpMessage::bufferToMessage(uint8_t* buf, size_t size){
     // struct TcpMessage recieved;
     seqNum = ((buf[0] << 8) + buf[1]);
     ackNum = ((buf[2] << 8) + buf[3]);
@@ -78,7 +78,7 @@ void TcpMessage::bufferToMessage(char* buf, int size){
 }
 
 //Solves the halting problem
-int TcpMessage::messageToBuffer(char* b){
+int TcpMessage::messageToBuffer(uint8_t* b){
     
     //Probably a better way to do this...
     b[0] = (seqNum >> 8) & 0xff;

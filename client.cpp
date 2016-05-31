@@ -47,7 +47,7 @@ int main(int argc, char **argv)
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = 1034;
 	size_t msgLen;
-	char buffer[BUFFER_SIZE];
+	uint8_t buffer[BUFFER_SIZE];
 	TcpMessage packetToSend, packetReceived;
 
 

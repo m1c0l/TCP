@@ -3,9 +3,9 @@
 #include <sys/socket.h>
 using namespace std;
 
-const uint8_t FIN_FLAG = 1;
-const uint8_t SYN_FLAG = 2;
-const uint8_t ACK_FLAG = 4;
+const uint16_t FIN_FLAG = 1;
+const uint16_t SYN_FLAG = 2;
+const uint16_t ACK_FLAG = 4;
 
 struct TcpMessage {
 public:
@@ -18,11 +18,12 @@ public:
 	string data = "";
 
 	TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind, string tcpFlags);
-	TcpMessage(char *buf, int size);
+	TcpMessage(uint8_t *buf, size_t size);
 	TcpMessage();
 	bool setFlag(string flag);
 	bool getFlag(char flag);
-	void bufferToMessage(char* buf, int size);
-	int messageToBuffer(char* b);
+	void bufferToMessage(uint8_t* buf, size_t size);
+	int messageToBuffer(uint8_t* b);
+	void sendto(int sockfd, sockaddr *si_other);
 	void dump();
 };

@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
 	int recv_length;
 	int send_length;
 	int data_inc = 1; //How much to increase the seq number by
-	char buf[BUFFER_SIZE];
+	uint8_t buf[BUFFER_SIZE];
 	socklen_t other_length = sizeof(other);
 	TcpMessage received;
 	TcpMessage toSend;
