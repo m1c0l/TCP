@@ -9,8 +9,6 @@
 
 using namespace std;
  
-#define BUFFER_SIZE 512  //Max length of buffer
-
 #define OUTPUT_FILE "client-dump" // the file received and saved by the client
  
 int main(int argc, char **argv)
@@ -43,7 +41,7 @@ int main(int argc, char **argv)
     }
 
 
-	uint16_t seqToSend = rand() % 65536;
+	uint16_t seqToSend = rand() % 0xffff;
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = 1034;
 	TcpMessage packetToSend, packetReceived;

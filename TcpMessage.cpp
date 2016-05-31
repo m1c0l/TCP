@@ -7,9 +7,6 @@
 
 using namespace std;
 
-const int BUFFER_SIZE = 1024;
-
-
 TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind,
 		string tcpFlags) {
 	seqNum = seq;
@@ -67,7 +64,7 @@ void TcpMessage::bufferToMessage(uint8_t* buf, size_t size){
     recvWindow = ((buf[4] << 8) + buf[5]);
     flags =  buf[7] & 0xff;
     data.assign((char*)buf+8, size-8);
-    return;   
+    return;
    
 }
 
@@ -87,7 +84,7 @@ size_t TcpMessage::messageToBuffer(uint8_t* b) {
 	data.copy((char*)b + 8, data.size(), 0);
 
 	// 8 byte header + body
-	return 8 + data.size();
+	return HEADER_SIZE + data.size();
 }
 
 void TcpMessage::sendto(int sockfd, sockaddr_in *si_other, socklen_t len) {

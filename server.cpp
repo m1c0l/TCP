@@ -9,15 +9,9 @@
 #include <unistd.h>
 #include <fstream>
 #include <sys/stat.h>
-#include "TcpMessage.h"
-
-
 #include <thread>
 #include <iostream>
-#include <sys/socket.h>
-
-const int BUFFER_SIZE = 1032;
-const int DATA_SIZE = 1024;
+#include "TcpMessage.h"
 
 using namespace std;
 
@@ -125,7 +119,7 @@ int main(int argc, char **argv) {
 	seqToSend = received.ackNum;
 	data_inc = received.data.length() ? 1 : received.data.length();   
 	ackToSend = received.seqNum + data_inc;
-	char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
+	char filebuf[DATA_SIZE];
 	wantedFile.open(filename);
 	if (!wantedFile){
 		perror("fstream open");
@@ -145,8 +139,8 @@ int main(int argc, char **argv) {
 
 		memset(filebuf, 0, DATA_SIZE);
 
-		//Read 1024 bytes normally, otherwise read the exact amount needed for the last packet
-		int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : 1024; 
+		//Read DATA_SIZE bytes normally, otherwise read the exact amount needed for the last packet
+		int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : DATA_SIZE;
 		wantedFile.read(filebuf, bytesToGet);
 		string temp(filebuf, bytesToGet);
 		toSend.data = temp;
