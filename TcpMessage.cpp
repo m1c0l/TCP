@@ -18,10 +18,6 @@ TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind,
 	setFlag(tcpFlags);
 }
 
-TcpMessage::TcpMessage(uint8_t *buf, size_t size) {
-	bufferToMessage(buf, size);
-}
-
 TcpMessage::TcpMessage() {}
 
 bool TcpMessage::setFlag(string flag) {
@@ -66,15 +62,11 @@ bool TcpMessage::getFlag(char flag) {
 
 //Converts a char buffer from recvfrom into a TcpMessage object
 void TcpMessage::bufferToMessage(uint8_t* buf, size_t size){
-    // struct TcpMessage recieved;
     seqNum = ((buf[0] << 8) + buf[1]);
     ackNum = ((buf[2] << 8) + buf[3]);
     recvWindow = ((buf[4] << 8) + buf[5]);
     flags =  buf[7] & 0xff;
-    //sourcePort = buf[8];
-    //    destPort = buf[9];
-    //data.assign(buf+8, size-8);
-    //data.copy(buffer, size, 10);
+    data.assign((char*)buf+8, size-8);
     return;   
    
 }
@@ -91,12 +83,8 @@ size_t TcpMessage::messageToBuffer(uint8_t* b) {
     b[5] = recvWindow & 0xff;
     b[6] = 0x0;
     b[7] = flags;
-    //b[8] = sourcePort;
-    //b[9] = destPort;
     
-    //if (data != "")
-    //	data.copy(b, 1024, 8);
-	//return;
+	data.copy((char*)b + 8, data.size(), 0);
 
 	// 8 byte header + body
 	return 8 + data.size();

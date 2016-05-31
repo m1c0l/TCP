@@ -86,8 +86,8 @@ int main(int argc, char **argv)
 
 	while (true) {
 		/* receive data packet */
-		packetReceived.recvfrom(sockfd, &si_server, serverLen);
 		cout << "receiving data:" << endl;
+		packetReceived.recvfrom(sockfd, &si_server, serverLen);
 		packetReceived.dump();
 
 		// FIN received

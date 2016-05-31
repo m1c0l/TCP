@@ -157,8 +157,8 @@ int main(int argc, char **argv) {
 				toSend.seqNum = ackToSend + filepkts*bytesToGet;
 
 				cout << "sending packet " << filepkts << " of file: "<< filename << endl;
-				toSend.dump();
 				toSend.sendto(sockfd, &other, other_length);
+				toSend.dump();
 
 			}
 			break;

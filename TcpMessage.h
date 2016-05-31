@@ -17,12 +17,9 @@ public:
 	uint16_t ackNum = 0;
 	uint16_t recvWindow = 1034; //Double check this
 	uint16_t flags = 0;
-	//	uint8_t sourcePort = 0;
-	//uint8_t destPort = 0;
 	string data = "";
 
 	TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind, string tcpFlags);
-	TcpMessage(uint8_t *buf, size_t size);
 	TcpMessage();
 	bool setFlag(string flag);
 	bool getFlag(char flag);
