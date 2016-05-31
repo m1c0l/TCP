@@ -130,6 +130,7 @@ int main(int argc, char **argv)
 	packetToSend.dump();
 	
 	/* Send FIN */
+	seqToSend++;
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 	cout << "Sending FIN to server\n";
