@@ -29,6 +29,7 @@ public:
 	void bufferToMessage(uint8_t* buf, size_t size);
 	size_t messageToBuffer(uint8_t* b);
 	void sendto(int sockfd, sockaddr_in *si_other, socklen_t len);
+	void recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len);
 	void dump();
 };
 

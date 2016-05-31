@@ -59,9 +59,7 @@ int main(int argc, char **argv) {
 		return 2;
 	}
 
-	int recv_length;
 	int data_inc = 1; //How much to increase the seq number by
-	uint8_t buf[BUFFER_SIZE];
 	socklen_t other_length = sizeof(other);
 	TcpMessage received;
 	TcpMessage toSend;
@@ -73,17 +71,12 @@ int main(int argc, char **argv) {
 	int packsToSend;
 	int pktSent = 0;
 //	for (int packetsSent = 0; true ; packetsSent++) {
-	int packs_to_send;
+//	int packs_to_send;
 	string flagsToSend = "";
 	//	for (int packetsSent = 0; true ; packetsSent++) {
 	while (true){
 	    cout << "Waiting for something" << endl;
-	    if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
-		perror("recvfrom");
-	    }
-
-		//Obtain header from receive
-		received.bufferToMessage(buf, recv_length);
+		received.recvfrom(sockfd, &other, other_length);
 
 		cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cout << "Received:" << endl;
@@ -185,10 +178,8 @@ int main(int argc, char **argv) {
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
 
-	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
-		perror("recvfrom");
-	}
 	/* Should receive FIN-ACK from client */
+	received.recvfrom(sockfd, &other, other_length);
 	switch(received.flags) {
 		case FIN_FLAG | ACK_FLAG:
 			// TODO: success
@@ -199,10 +190,7 @@ int main(int argc, char **argv) {
 	}
 
 	/* Should receive FIN from client */
-	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
-		perror("recvfrom");
-	}
-	/* Should receive FIN-ACK from client */
+	received.recvfrom(sockfd, &other, other_length);
 	switch(received.flags) {
 		case FIN_FLAG:
 			// TODO: success
@@ -217,9 +205,7 @@ int main(int argc, char **argv) {
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
 
-	if ((recv_length = recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr *) &other, &other_length)) == -1) {
-		perror("recvfrom");
-	}
+	received.recvfrom(sockfd, &other, other_length);
 	/* TODO: shouldn't receive anything from client so deal with cases where client sends stuff */
 	
 	close(sockfd);

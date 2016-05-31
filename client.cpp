@@ -46,7 +46,6 @@ int main(int argc, char **argv)
 	uint16_t seqToSend = rand() % 65536;
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = 1034;
-	uint8_t buffer[BUFFER_SIZE];
 	TcpMessage packetToSend, packetReceived;
 
 
@@ -60,13 +59,7 @@ int main(int argc, char **argv)
 
 	/* receive SYN-ACK */
 
-	int recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
-			(sockaddr*)&si_server, &serverLen);
-	if (recv_length == -1) {
-		perror("recvfrom");
-		exit(1);
-	}
-	packetReceived = TcpMessage(buffer, recv_length);
+	packetReceived.recvfrom(sockfd, &si_server, serverLen);
 	cout << "receiving SYN-ACK:" << endl;
 	packetReceived.dump();
 	if (!packetReceived.getFlag('a') || !packetReceived.getFlag('s')) {
@@ -93,13 +86,7 @@ int main(int argc, char **argv)
 
 	while (true) {
 		/* receive data packet */
-		recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
-				(sockaddr*)&si_server, &serverLen);
-		if (recv_length == -1) {
-			perror("recvfrom");
-			exit(1);
-		}
-		packetReceived = TcpMessage(buffer, recv_length);
+		packetReceived.recvfrom(sockfd, &si_server, serverLen);
 		cout << "receiving data:" << endl;
 		packetReceived.dump();
 
@@ -126,13 +113,7 @@ int main(int argc, char **argv)
 
  
     /* Receive FIN from server */ 
-	recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
-			(sockaddr*)&si_server, &serverLen);
-	if (recv_length == -1) {
-		perror("recvfrom");
-		exit(1);
-	}
-	packetReceived = TcpMessage(buffer, recv_length);
+	packetReceived.recvfrom(sockfd, &si_server, serverLen);
 	switch (packetReceived.flags) {
 		case FIN_FLAG:
 			//TODO: success
@@ -153,13 +134,7 @@ int main(int argc, char **argv)
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 
     /* Receive FIN-ACK from server */ 
-	recv_length = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
-			(sockaddr*)&si_server, &serverLen);
-	if (recv_length == -1) {
-		perror("recvfrom");
-		exit(1);
-	}
-	packetReceived = TcpMessage(buffer, recv_length);
+	packetReceived.recvfrom(sockfd, &si_server, serverLen);
 	switch (packetReceived.flags) {
 		case FIN_FLAG & ACK_FLAG:
 			//TODO: success

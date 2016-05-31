@@ -111,6 +111,16 @@ void TcpMessage::sendto(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	}
 }
 
+void TcpMessage::recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len) {
+	uint8_t buf[BUFFER_SIZE];
+	int recv_len = ::recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr*)si_other, &len);
+	if (recv_len == -1) {
+		perror("recvfrom");
+		exit(1);
+	}
+	bufferToMessage(buf, recv_len);
+}
+
 // Print out the TcpMessage's contents
 void TcpMessage::dump() {
     cout << "seqNum = " << seqNum << endl;
