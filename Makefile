@@ -3,7 +3,7 @@ CXXOPTIMIZE= -g
 CXXFLAGS= -g -Wall -pthread -std=c++11 $(CXXOPTIMIZE)
 DISTDIR= CS118Project2
 
-CLASSES = TcpMessage
+CLASSES = TcpMessage Utils
 
 all: server client
 

@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "Utils.h"
 #include "TcpMessage.h"
 
 using namespace std;
@@ -41,7 +42,7 @@ int main(int argc, char **argv)
     }
 
 
-	uint16_t seqToSend = rand() % 0xffff;
+	uint16_t seqToSend = rand() % MAX_SEQ_NUM;
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = 1034;
 	TcpMessage packetToSend, packetReceived;
@@ -70,8 +71,8 @@ int main(int argc, char **argv)
 
 	/* send ACK */
 
-	seqToSend++;// increase sequence number by 1
-	ackToSend = packetReceived.seqNum + 1;
+	seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
+	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
 	cout << "sending ACK:" << endl;
 	packetToSend.dump();
@@ -98,10 +99,9 @@ int main(int argc, char **argv)
 		outFile.write(data, dataSize);
 
 
-		/* send ACK */
+		/* send ACK; assume seq # same since client doesn't send data */
 
-		seqToSend = packetReceived.ackNum;
-		ackToSend = packetReceived.seqNum + dataSize;
+		ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
 		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
 		cout << "sending ACK:" << endl;
 		packetToSend.dump();
@@ -121,30 +121,28 @@ int main(int argc, char **argv)
 			exit(1);
 	}*/
 
-	/* Send FIN-ACK */
-	seqToSend++;
-	ackToSend = packetReceived.seqNum + 1;
+	/* Send FIN-ACK; seq # stays same b/c no payload*/
+	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 	cout << "Sending FIN-ACK to server\n";
 	packetToSend.dump();
 	
-	/* Send FIN */
-	seqToSend++;
+	/* Send FIN; seq # stays same b/c no payload */
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 	cout << "Sending FIN to server\n";
 	packetToSend.dump();
 
-    /* Receive FIN-ACK from server */ 
+    /* Receive ACK of FIN without the FIN flag from server */ 
 	packetReceived.recvfrom(sockfd, &si_server, serverLen);
 	switch (packetReceived.flags) {
-		case FIN_FLAG | ACK_FLAG:
+		case ACK_FLAG:
 			//TODO: success
-			cout << "Received FIN-ACK from server\n";
+			cout << "Received ACK of FIN from server\n";
 			break;
 		default:
-			cerr << "FIN-ACK wasn't received from server!\n";
+			cerr << "ACK of FIN wasn't received from server!\n";
 			exit(1);
 	}
 	packetReceived.dump();

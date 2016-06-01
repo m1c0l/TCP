@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <thread>
 #include <iostream>
+#include "Utils.h"
 #include "TcpMessage.h"
 
 using namespace std;
@@ -53,13 +54,12 @@ int main(int argc, char **argv) {
 		return 2;
 	}
 
-	int data_inc = 1; //How much to increase the seq number by
 	socklen_t other_length = sizeof(other);
 	TcpMessage received;
 	TcpMessage toSend;
 	bool hasReceivedSyn = false;
 	bool sendFile = false;
-	uint16_t seqToSend = rand() % 0xffff; //The first sync
+	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
 	ifstream wantedFile;
 	int packsToSend;
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
 			break;
 		}	      
 
-		ackToSend = received.seqNum + 1;
+		ackToSend = incSeqNum(received.seqNum, 1);
 		toSend = TcpMessage(seqToSend, ackToSend, BUFFER_SIZE, flagsToSend);
 		toSend.sendto(sockfd, &other, other_length);
 		cout << "Handshake: sending packet\n";
@@ -133,12 +133,9 @@ int main(int argc, char **argv) {
 
 	// if the client sent data, increment ack by that number
 	size_t recvLength = received.data.length();
-	if (recvLength) {
-		data_inc = recvLength;
-	}	
-	ackToSend = received.seqNum + data_inc;
+	ackToSend = incSeqNum(received.seqNum, recvLength);
 	// increment our sequence number by 1
-	seqToSend++; 
+	seqToSend = incSeqNum(seqToSend, 1); 
 
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
 
@@ -156,7 +153,7 @@ int main(int argc, char **argv) {
 		toSend.sendto(sockfd, &other, other_length);
 
 		// Increase sequence number to send next time by number of bytes sent
-		seqToSend += bytesToGet;
+		seqToSend = incSeqNum(seqToSend, bytesToGet);
 	}
 
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++) {
@@ -211,12 +208,12 @@ int main(int argc, char **argv) {
 	}
 	received.dump();
 
-	flagsToSend = "FA";
-	seqToSend++;// increase sequence number by 1
-	ackToSend = received.seqNum;
+	flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
+	seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
+	ackToSend = incSeqNum(received.seqNum, 1); // increase ack by 1
 	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
-	cout << "Sending FIN-ACK\n";
+	cout << "Sending ACK of FIN\n";
 	toSend.dump();
 
 	cout << "Shouldn't receive anything else from client now\n";
