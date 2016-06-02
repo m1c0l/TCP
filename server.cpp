@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
 		int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : DATA_SIZE;
 		wantedFile.read(filebuf, bytesToGet);
 		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, "A");
-		toSend.data = string(filebuf);
+		toSend.data = string(filebuf, bytesToGet);
 
 		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
 		toSend.dump();
