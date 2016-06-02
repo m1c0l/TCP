@@ -14,6 +14,8 @@ const uint16_t FIN_FLAG = 1;
 const uint16_t SYN_FLAG = 2;
 const uint16_t ACK_FLAG = 4;
 
+const int RECV_SUCCESS = 1;
+const int RECV_TIMEOUT = 2;
 
 uint16_t incSeqNum(uint16_t seq, uint16_t increment);
 

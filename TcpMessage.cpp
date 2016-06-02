@@ -102,13 +102,13 @@ int TcpMessage::recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	if (recv_len == -1) {
 		if (errno == EWOULDBLOCK) {
 			cerr << "timeout\n";
-			return -1;
+			return RECV_TIMEOUT;
 		}	
 		perror("recvfrom");
 		exit(1);
 	}
 	bufferToMessage(buf, recv_len);
-	return 0;
+	return RECV_SUCCESS;
 }
 
 // Print out the TcpMessage's contents
