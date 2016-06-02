@@ -146,24 +146,24 @@ int main(int argc, char **argv)
 	ofstream outFile(OUTPUT_FILE);
 
 	TcpMessage delayedAck;
-	bool sendDelayedAck = false;
+	bool delayedAckPending = false;
 
 	while (true) {
 		/* receive data packet */
 		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
-		if (r == RECV_SUCCESS) { // show debug if packet received before timeout
-			cout << "receiving data:" << endl;
-			packetReceived.dump();
-		}
-		if (sendDelayedAck) { // if a delayed ACK is pending, send it
-			cout << "sending ACK:" << endl;
-			packetToSend.dump();
-			delayedAck.sendto(sockfd, &si_server, serverLen);
-			sendDelayedAck = false;
-		}
 		if (r == RECV_TIMEOUT) { // if timeout, try to recvfrom again
+			if (delayedAckPending) { // send out a delayed ACK
+				cout << "sending ACK:" << endl;
+				packetToSend.dump();
+				delayedAck.sendto(sockfd, &si_server, serverLen);
+				delayedAckPending = false;
+			}
 			continue;
 		}
+
+		// else, r == RECV_SUCCESS
+		cout << "receiving data:" << endl;
+		packetReceived.dump();
 
 		// FIN received
 		if (packetReceived.getFlag('F'))
@@ -174,11 +174,23 @@ int main(int argc, char **argv)
 		streamsize dataSize = packetReceived.data.size();
 		outFile.write(data, dataSize);
 
+		// send cumulative ACK if a delayed ACK is pending
+		if (delayedAckPending) {
+			ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
+			delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
+			delayedAckPending = true;
 
-		/* prepare delayed ACK; assume seq # same since client doesn't send data */
-		ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
-		delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-		sendDelayedAck = true;
+			cout << "sending ACK:" << endl;
+			packetToSend.dump();
+			delayedAck.sendto(sockfd, &si_server, serverLen);
+			delayedAckPending = false;
+		}
+		else {
+			/* prepare delayed ACK */
+			ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
+			delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
+			delayedAckPending = true;
+		}
 
 	}
 
