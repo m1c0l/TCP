@@ -62,6 +62,7 @@ int main(int argc, char **argv) {
 	bool sendFile = false;
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
+	uint16_t clientRecvWindow; // Set this each time client sends packet
 	ifstream wantedFile;
 	int packsToSend;
 	int pktSent = 0;
@@ -128,7 +129,8 @@ int main(int argc, char **argv) {
 		}	      
 
 		ackToSend = incSeqNum(received.seqNum, 1);
-		toSend = TcpMessage(seqToSend, ackToSend, BUFFER_SIZE, flagsToSend);
+		clientRecvWindow = received.recvWindow;
+		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 		toSend.sendto(sockfd, &other, other_length);
 		cout << "Handshake: sending packet\n";
 		toSend.dump();
@@ -162,7 +164,7 @@ int main(int argc, char **argv) {
 		//Read DATA_SIZE bytes normally, otherwise read the exact amount needed for the last packet
 		int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : DATA_SIZE;
 		wantedFile.read(filebuf, bytesToGet);
-		toSend = TcpMessage(seqToSend, ackToSend, 1034, "A");
+		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, "A");
 		toSend.data = string(filebuf);
 
 		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
@@ -194,7 +196,7 @@ int main(int argc, char **argv) {
 	//seqToSend = received.ackNum;
 	//ackToSend = received.seqNum;
 	ackToSend = 0; // ACK is invalid this packet
-	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
+	toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
 	cout << "Sending FIN\n";
 	toSend.dump();
@@ -228,7 +230,7 @@ int main(int argc, char **argv) {
 	flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
 	seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
 	ackToSend = incSeqNum(received.seqNum, 1); // increase ack by 1
-	toSend = TcpMessage(seqToSend, ackToSend, 1034, flagsToSend);
+	toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 	toSend.sendto(sockfd, &other, other_length);
 	cout << "Sending ACK of FIN\n";
 	toSend.dump();

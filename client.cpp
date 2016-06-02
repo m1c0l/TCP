@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM;
    	uint16_t ackToSend = 0;
-	uint16_t recvWindowToSend = 1034;
+	uint16_t recvWindowToSend = INIT_RECV_WINDOW;
 	TcpMessage packetToSend, packetReceived;
 
 
