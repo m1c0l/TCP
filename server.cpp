@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
 
 	memset(addr.sin_zero, '\0', sizeof(addr.sin_zero));
 
-	if(bind(sockfd, (sockaddr*) &addr, sizeof(addr)) == -1) {
+	if (bind(sockfd, (sockaddr*) &addr, sizeof(addr)) == -1) {
 		perror("bind");
 		return 2;
 	}
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
 
 		//Send SYN-ACK if client is trying to set up connection
 	      
-		switch(received.flags){
+		switch (received.flags) {
 		case SYN_FLAG:
 		    if (hasReceivedSyn) {
 				cerr << "Multiple SYNs\n"; 
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
 		   
 		    break;
 		
-		case SYN_FLAG | ACK_FLAG :
+		case SYN_FLAG | ACK_FLAG:
 		    cerr << "Both SYN and ACK were set by client\n";
 		    //exit(1);
 		    break;

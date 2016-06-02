@@ -46,7 +46,7 @@ int main(int argc, char **argv)
     si_server.sin_port = htons(stoi(port));
 	socklen_t serverLen = sizeof(si_server);
 
-    if (inet_aton(ip.c_str() , &si_server.sin_addr) == 0) {
+    if (inet_aton(ip.c_str(), &si_server.sin_addr) == 0) {
         perror("inet_aton");
 	    exit(1);
     }

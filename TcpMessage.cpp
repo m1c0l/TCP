@@ -18,8 +18,8 @@ TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind, string tcp
 TcpMessage::TcpMessage() {}
 
 bool TcpMessage::setFlag(string flag) {
-    for(size_t i = 0; i<flag.size(); i++){
-        switch(flag[i]) {
+    for (size_t i = 0; i < flag.size(); i++){
+        switch (flag[i]) {
             case 'A':
             case 'a':
                 flags |= ACK_FLAG;
@@ -41,7 +41,7 @@ bool TcpMessage::setFlag(string flag) {
 }
 
 bool TcpMessage::getFlag(char flag) {
-    switch(flag) {
+    switch (flag) {
         case 'A':
         case 'a':
             return !!(flags & ACK_FLAG);
@@ -58,7 +58,7 @@ bool TcpMessage::getFlag(char flag) {
 }
 
 //Converts a char buffer from recvfrom into a TcpMessage object
-void TcpMessage::bufferToMessage(uint8_t* buf, size_t size){
+void TcpMessage::bufferToMessage(uint8_t* buf, size_t size) {
     seqNum = ((buf[0] << 8) + buf[1]);
     ackNum = ((buf[2] << 8) + buf[3]);
     recvWindow = ((buf[4] << 8) + buf[5]);
