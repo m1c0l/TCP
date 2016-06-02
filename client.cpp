@@ -6,11 +6,27 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <chrono>
+#include <future>
+
 #include "Utils.h"
 #include "TcpMessage.h"
 
 using namespace std;
  
+const float TIMEOUT = 0.5f; // seconds
+
+template<typename T>
+int waitFor(future<T>& promise) {
+	chrono::seconds timer(TIMEOUT);
+	// abort if request times out
+	if (promise.wait_for(timer) == future_status::timeout) {
+		cerr << "Connection timed out." << '\n';
+		return -1;
+	}
+	return 0;
+}
+
 #define OUTPUT_FILE "client-dump" // the file received and saved by the client
  
 int main(int argc, char **argv)
@@ -63,7 +79,8 @@ int main(int argc, char **argv)
         perror("socket");
 		exit(1);
     }
-	
+
+	/* Not using this timeout code anymore	
 	// Set receive timeout of 0.5 s
 	timeval recvTimeout;
 	recvTimeout.tv_sec = 0;
@@ -72,7 +89,7 @@ int main(int argc, char **argv)
 	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
 		perror("setsockopt");
 		return 1;
-	}
+	}*/
  
     sockaddr_in si_server;
     memset((char *) &si_server, 0, sizeof(si_server));

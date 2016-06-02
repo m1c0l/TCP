@@ -11,10 +11,26 @@
 #include <sys/stat.h>
 #include <thread>
 #include <iostream>
+#include <chrono>
+#include <future>
+
 #include "Utils.h"
 #include "TcpMessage.h"
 
 using namespace std;
+
+const float TIMEOUT = 0.5f; // seconds
+
+template<typename T>
+int waitFor(future<T>& promise) {
+	chrono::seconds timer(TIMEOUT);
+	// abort if request times out
+	if (promise.wait_for(timer) == future_status::timeout) {
+		cerr << "Connection timed out." << '\n';
+		return -1;
+	}
+	return 0;
+}
 
 int main(int argc, char **argv) {
 	if (argc != 3) {
@@ -75,7 +91,8 @@ int main(int argc, char **argv) {
 		cout << "Received:" << endl;
 		received.dump();
 
-		if (!packetsSent) {
+		/* Not using this timeout code anymore
+		   if (!packetsSent) {
 			// Set receive timeout of 0.5s
 			// Only want to run this code once
 			timeval recvTimeout;
@@ -86,7 +103,7 @@ int main(int argc, char **argv) {
 				perror("setsockopt");
 				return 1;
 			}
-		}
+		}*/
 
 
 		//Send SYN-ACK if client is trying to set up connection
