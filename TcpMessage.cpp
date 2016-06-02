@@ -7,8 +7,7 @@
 
 using namespace std;
 
-TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind,
-		string tcpFlags) {
+TcpMessage::TcpMessage(uint16_t seq, uint16_t ack, uint16_t recvWind, string tcpFlags) {
 	seqNum = seq;
 	ackNum = ack;
 	recvWindow = recvWind;

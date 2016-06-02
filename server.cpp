@@ -78,8 +78,10 @@ int main(int argc, char **argv) {
 	      
 		switch(received.flags){
 		case SYN_FLAG:
-		    if (hasReceivedSyn)
-			{cerr <<"Multiple SYNs"; break;}
+		    if (hasReceivedSyn) {
+				cerr << "Multiple SYNs"; 
+				break;
+			}
 		    hasReceivedSyn = true;
 		    flagsToSend ="SA";
 		   
@@ -91,8 +93,10 @@ int main(int argc, char **argv) {
 		    break;
 
 		case ACK_FLAG:
-		    if (!hasReceivedSyn)
-			{cerr<< "ACK before handshake"; break;}
+		    if (!hasReceivedSyn) {
+				cerr << "ACK before handshake"; 
+				break;
+			}
 		    flagsToSend = "A";
 		    //Time to start sending the file back
 		    sendFile = true;
@@ -118,18 +122,18 @@ int main(int argc, char **argv) {
 	
 	char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
 	wantedFile.open(filename);
-	if (!wantedFile){
+	if (!wantedFile) {
 		perror("fstream open");
 		exit(1);
 	}
 
 	off_t bodyLength = 0;
 	struct stat st; // of course C names a class and function the same thing...
-	if(stat(filename.c_str(), &st) == -1) {
+	if (stat(filename.c_str(), &st) == -1) {
 		perror("stat");
 	} 
 	bodyLength = st.st_size;
-	packsToSend = ( 1+ (( bodyLength -1)/DATA_SIZE));
+	packsToSend = 1 + ((bodyLength - 1) / DATA_SIZE);
 
 	// if the client sent data, increment ack by that number
 	size_t recvLength = received.data.length();
@@ -137,16 +141,15 @@ int main(int argc, char **argv) {
 	// increment our sequence number by 1
 	seqToSend = incSeqNum(seqToSend, 1); 
 
-	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++){
+	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++) {
 
 		memset(filebuf, 0, DATA_SIZE);
 
 		//Read DATA_SIZE bytes normally, otherwise read the exact amount needed for the last packet
 		int bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : DATA_SIZE;
 		wantedFile.read(filebuf, bytesToGet);
-		string temp(filebuf, bytesToGet);
-		toSend.data = temp;
 		toSend = TcpMessage(seqToSend, ackToSend, 1034, "A");
+		toSend.data = string(filebuf);
 
 		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
 		toSend.dump();
