@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <netdb.h>
 #include "Utils.h"
 #include "TcpMessage.h"
 
@@ -21,6 +22,39 @@ int main(int argc, char **argv)
 
     string ip = argv[1];
     string port = argv[2];
+
+	// Get IP address if we're given a hostname
+	addrinfo hints;
+	addrinfo* res;
+
+	// prepare hints
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET; // IPv4
+	hints.ai_socktype = SOCK_STREAM; // TCP
+
+	// get address
+	int status = 0;
+	if ((status = getaddrinfo(ip.c_str(), port.c_str(), &hints, &res)) != 0) {
+		cerr << "getaddrinfo: " << gai_strerror(status) << '\n';
+		exit(2);
+	}
+
+	addrinfo* p = res;
+	// convert address to IPv4 address
+	sockaddr_in* ipv4;
+	char ipstr[INET_ADDRSTRLEN] = {'\0'};
+	if (p != 0) {
+		ipv4 = (sockaddr_in*)p->ai_addr;
+
+		// convert the IP to a string
+		inet_ntop(p->ai_family, &(ipv4->sin_addr), ipstr, sizeof(ipstr));
+	}
+	else {
+		cerr << "IP address not found for " << ip << endl;
+		exit(3);
+	}
+	ip = ipstr;
+	cout << "IP: " << ip << "\n";
 
 	srand (time(NULL)); //Used to generate random ISN
  
