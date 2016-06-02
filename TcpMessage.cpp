@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 using namespace std;
 
@@ -95,14 +96,19 @@ void TcpMessage::sendto(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	}
 }
 
-void TcpMessage::recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len) {
+int TcpMessage::recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	uint8_t buf[BUFFER_SIZE];
 	int recv_len = ::recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr*)si_other, &len);
 	if (recv_len == -1) {
+		if (errno == EWOULDBLOCK) {
+			cerr << "timeout\n";
+			return -1;
+		}	
 		perror("recvfrom");
 		exit(1);
 	}
 	bufferToMessage(buf, recv_len);
+	return 0;
 }
 
 // Print out the TcpMessage's contents

@@ -37,10 +37,11 @@ int main(int argc, char **argv) {
 
 	//Timeout flags and stuff could be set here
 	int yes = 1;
-	if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))== 1) {
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 		perror("setsockopt");
 		return 1;
 	}
+
 
 	sockaddr_in addr, other;
 	addr.sin_family = AF_INET;
@@ -73,13 +74,26 @@ int main(int argc, char **argv) {
 		cout << "Received:" << endl;
 		received.dump();
 
+		if (!packetsSent) {
+			// Set receive timeout of 0.5s
+			// Only want to run this code once
+			timeval recvTimeout;
+			recvTimeout.tv_sec = 0;
+			recvTimeout.tv_usec = 5000;
+
+			if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
+				perror("setsockopt");
+				return 1;
+			}
+		}
+
 
 		//Send SYN-ACK if client is trying to set up connection
 	      
 		switch(received.flags){
 		case SYN_FLAG:
 		    if (hasReceivedSyn) {
-				cerr << "Multiple SYNs"; 
+				cerr << "Multiple SYNs\n"; 
 				break;
 			}
 		    hasReceivedSyn = true;
@@ -88,13 +102,13 @@ int main(int argc, char **argv) {
 		    break;
 		
 		case SYN_FLAG | ACK_FLAG :
-		    cerr << "Both SYN and ACK were set by client";
+		    cerr << "Both SYN and ACK were set by client\n";
 		    //exit(1);
 		    break;
 
 		case ACK_FLAG:
 		    if (!hasReceivedSyn) {
-				cerr << "ACK before handshake"; 
+				cerr << "ACK before handshake\n"; 
 				break;
 			}
 		    flagsToSend = "A";
@@ -104,7 +118,7 @@ int main(int argc, char **argv) {
 		    break;
 		    
 		default:
-		    cerr << "Incorrect flags set";
+		    cerr << "Incorrect flags set\n";
 		    break;
 		}
 
