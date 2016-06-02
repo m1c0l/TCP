@@ -16,6 +16,7 @@ using namespace std;
  
 const float TIMEOUT = 0.5f; // seconds
 
+/*
 template<typename T>
 int waitFor(future<T>& promise) {
 	chrono::seconds timer(TIMEOUT);
@@ -26,6 +27,7 @@ int waitFor(future<T>& promise) {
 	}
 	return 0;
 }
+*/
 
 #define OUTPUT_FILE "client-dump" // the file received and saved by the client
  
@@ -80,7 +82,6 @@ int main(int argc, char **argv)
 		exit(1);
     }
 
-	/* Not using this timeout code anymore	
 	// Set receive timeout of 0.5 s
 	timeval recvTimeout;
 	recvTimeout.tv_sec = 0;
@@ -89,7 +90,7 @@ int main(int argc, char **argv)
 	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
 		perror("setsockopt");
 		return 1;
-	}*/
+	}
  
     sockaddr_in si_server;
     memset((char *) &si_server, 0, sizeof(si_server));
@@ -144,11 +145,25 @@ int main(int argc, char **argv)
 
 	ofstream outFile(OUTPUT_FILE);
 
+	TcpMessage delayedAck;
+	bool sendDelayedAck = false;
+
 	while (true) {
 		/* receive data packet */
-		cout << "receiving data:" << endl;
-		packetReceived.recvfrom(sockfd, &si_server, serverLen);
-		packetReceived.dump();
+		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
+		if (r == RECV_SUCCESS) { // show debug if packet received before timeout
+			cout << "receiving data:" << endl;
+			packetReceived.dump();
+		}
+		if (sendDelayedAck) { // if a delayed ACK is pending, send it
+			cout << "sending ACK:" << endl;
+			packetToSend.dump();
+			delayedAck.sendto(sockfd, &si_server, serverLen);
+			sendDelayedAck = false;
+		}
+		if (r == RECV_TIMEOUT) { // if timeout, try to recvfrom again
+			continue;
+		}
 
 		// FIN received
 		if (packetReceived.getFlag('F'))
@@ -160,13 +175,10 @@ int main(int argc, char **argv)
 		outFile.write(data, dataSize);
 
 
-		/* send ACK; assume seq # same since client doesn't send data */
-
+		/* prepare delayed ACK; assume seq # same since client doesn't send data */
 		ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
-		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-		cout << "sending ACK:" << endl;
-		packetToSend.dump();
-		packetToSend.sendto(sockfd, &si_server, serverLen);
+		delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
+		sendDelayedAck = true;
 
 	}
 
