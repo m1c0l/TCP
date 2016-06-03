@@ -27,7 +27,10 @@ bool keepGettingAcks = true;
 void getAcksHelper(uint16_t &lastAck, uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
 	TcpMessage ack;
 	while (keepGettingAcks && lastAck != finalAck) {
-		ack.recvfrom(sockfd, si_other, len);
+		if (ack.recvfrom(sockfd, si_other, len) == RECV_SUCCESS) {
+			cout << "received ACK:" << endl;
+			ack.dump();
+		}
 		lastAck = ack.ackNum;
 	}
 }
