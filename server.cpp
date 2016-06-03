@@ -57,6 +57,16 @@ int main(int argc, char **argv) {
 		perror("setsockopt");
 		return 1;
 	}
+	// Set receive timeout of 0.5s
+	timeval recvTimeout;
+	recvTimeout.tv_sec = 0;
+	recvTimeout.tv_usec = 500000;
+
+	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
+		perror("setsockopt");
+		return 1;
+	}
+
 
 
 	sockaddr_in addr, other;
@@ -90,20 +100,6 @@ int main(int argc, char **argv) {
 		cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cout << "Received:" << endl;
 		received.dump();
-
-		/* Not using this timeout code anymore
-		   if (!packetsSent) {
-			// Set receive timeout of 0.5s
-			// Only want to run this code once
-			timeval recvTimeout;
-			recvTimeout.tv_sec = 0;
-			recvTimeout.tv_usec = 500000;
-
-			if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
-				perror("setsockopt");
-				return 1;
-			}
-		}*/
 
 
 		//Send SYN-ACK if client is trying to set up connection
@@ -153,7 +149,7 @@ int main(int argc, char **argv) {
 		toSend.dump();
 	}
 	
-	char filebuf[DATA_SIZE]; //OHGODMAGICNUMBAAAHHHHHH
+	char filebuf[DATA_SIZE];
 	wantedFile.open(filename);
 	if (!wantedFile) {
 		perror("fstream open");
@@ -173,6 +169,11 @@ int main(int argc, char **argv) {
 	ackToSend = incSeqNum(received.seqNum, recvLength);
 	// increment our sequence number by 1
 	seqToSend = incSeqNum(seqToSend, 1); 
+
+	/* if cum ack recvd, send next packet
+	 * if ack for prev packet, resend current
+	 * if timeout, resend
+	 * */
 
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++) {
 
