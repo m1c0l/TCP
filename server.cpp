@@ -24,18 +24,18 @@ const float TIMEOUT = 0.5f; // seconds
 
 bool keepGettingAcks = true;
 
-void getAcksHelper(uint16_t &lastAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+void getAcksHelper(uint16_t &lastAck, uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
 	TcpMessage ack;
-	while (keepGettingAcks) {
+	while (keepGettingAcks && lastAck != finalAck) {
 		ack.recvfrom(sockfd, si_other, len);
 		lastAck = ack.ackNum;
 	}
 }
 
 // Receive ACKs for 0.5 seconds and returns the latest ACK received
-void getAcks(uint16_t &lastAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+void getAcks(uint16_t &lastAck, uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
 	chrono::milliseconds timer(500);
-	future<void> promise = async(launch::async, getAcksHelper, ref(lastAck), sockfd, si_other, len);
+	future<void> promise = async(launch::async, getAcksHelper, ref(lastAck), finalAck, sockfd, si_other, len);
 	promise.wait_for(timer); // run for 0.5s
 	keepGettingAcks = false;
 }
@@ -205,17 +205,19 @@ int main(int argc, char **argv) {
 		seqToSend = incSeqNum(seqToSend, bytesToGet);
 	}
 
+	uint16_t lastAckExpected = seqToSend;
+
 	// receive ACKs and retransmit until all packets ACKed
 	while (true) {
 		cerr << "loop\n";
-		getAcks(lastAckRecvd, sockfd, &other, other_length);
+		getAcks(lastAckRecvd, lastAckExpected, sockfd, &other, other_length);
 		// all packets acked
-		if (lastAckRecvd == seqToSend) {
+		if (lastAckRecvd == lastAckExpected) {
 			break;
 		}
 		// retransmit
 		if (packetsInWindow.count(lastAckRecvd) == 0) {
-			cerr << "packet with sequence number " << seqToSend
+			cerr << "packet with sequence number " << lastAckRecvd
 				 << " not in packetsInWindow" << '\n';
 		}
 		else {
