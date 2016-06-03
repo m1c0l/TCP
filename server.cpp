@@ -13,6 +13,7 @@
 #include <iostream>
 #include <chrono>
 #include <future>
+#include <unordered_map>
 
 #include "Utils.h"
 #include "TcpMessage.h"
@@ -21,15 +22,22 @@ using namespace std;
 
 const float TIMEOUT = 0.5f; // seconds
 
-template<typename T>
-int waitFor(future<T>& promise) {
-	chrono::seconds timer(TIMEOUT);
-	// abort if request times out
-	if (promise.wait_for(timer) == future_status::timeout) {
-		cerr << "Connection timed out." << '\n';
-		return -1;
+bool keepGettingAcks = true;
+
+void getAcksHelper(uint16_t &lastAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+	TcpMessage ack;
+	while (keepGettingAcks) {
+		ack.recvfrom(sockfd, si_other, len);
+		lastAck = ack.ackNum;
 	}
-	return 0;
+}
+
+// Receive ACKs for 0.5 seconds and returns the latest ACK received
+void getAcks(uint16_t &lastAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+	chrono::milliseconds timer(500);
+	future<void> promise = async(launch::async, getAcksHelper, ref(lastAck), sockfd, si_other, len);
+	promise.wait_for(timer); // run for 0.5s
+	keepGettingAcks = false;
 }
 
 int main(int argc, char **argv) {
@@ -57,16 +65,6 @@ int main(int argc, char **argv) {
 		perror("setsockopt");
 		return 1;
 	}
-	// Set receive timeout of 0.5s
-	timeval recvTimeout;
-	recvTimeout.tv_sec = 0;
-	recvTimeout.tv_usec = 500000;
-
-	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
-		perror("setsockopt");
-		return 1;
-	}
-
 
 
 	sockaddr_in addr, other;
@@ -88,6 +86,7 @@ int main(int argc, char **argv) {
 	bool sendFile = false;
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
+	uint16_t lastAckRecvd = seqToSend;
 	uint16_t clientRecvWindow; // Set this each time client sends packet
 	ifstream wantedFile;
 	int packsToSend;
@@ -100,6 +99,19 @@ int main(int argc, char **argv) {
 		cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cout << "Received:" << endl;
 		received.dump();
+
+		if (!packetsSent) {
+			// Set receive timeout of 0.5s
+			// Only want to run this code once
+			timeval recvTimeout;
+			recvTimeout.tv_sec = 0;
+			recvTimeout.tv_usec = 500000;
+
+			if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
+				perror("setsockopt");
+				return 1;
+			}
+		}
 
 
 		//Send SYN-ACK if client is trying to set up connection
@@ -170,10 +182,7 @@ int main(int argc, char **argv) {
 	// increment our sequence number by 1
 	seqToSend = incSeqNum(seqToSend, 1); 
 
-	/* if cum ack recvd, send next packet
-	 * if ack for prev packet, resend current
-	 * if timeout, resend
-	 * */
+	unordered_map<uint16_t, TcpMessage> packetsInWindow; // seqNum => TcpMessage
 
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++) {
 
@@ -185,6 +194,9 @@ int main(int argc, char **argv) {
 		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, "A");
 		toSend.data = string(filebuf, bytesToGet);
 
+		// store packet in case retransmission needed
+		packetsInWindow[toSend.seqNum] = toSend;
+
 		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
 		toSend.dump();
 		toSend.sendto(sockfd, &other, other_length);
@@ -193,6 +205,28 @@ int main(int argc, char **argv) {
 		seqToSend = incSeqNum(seqToSend, bytesToGet);
 	}
 
+	// receive ACKs and retransmit until all packets ACKed
+	while (true) {
+		cerr << "loop\n";
+		getAcks(lastAckRecvd, sockfd, &other, other_length);
+		// all packets acked
+		if (lastAckRecvd == seqToSend) {
+			break;
+		}
+		// retransmit
+		if (packetsInWindow.count(lastAckRecvd) == 0) {
+			cerr << "packet with sequence number " << seqToSend
+				 << " not in packetsInWindow" << '\n';
+		}
+		else {
+			cout << "Retransmitting:" << endl;
+			packetsInWindow[lastAckRecvd].dump();
+			packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
+		}
+	}
+	cout << "out of loop\n";
+
+	/*
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++) {
 		received.recvfrom(sockfd, &other, other_length);
 		// receive ack for data
@@ -206,6 +240,7 @@ int main(int argc, char **argv) {
 				cerr << "ACK not received!";
 		}
 	}
+	*/
 
 	/* send FIN */
 
