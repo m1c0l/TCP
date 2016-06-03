@@ -151,8 +151,12 @@ int main(int argc, char **argv)
 	while (true) {
 		/* receive data packet */
 		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
-		if (r == RECV_TIMEOUT) { // if timeout, try to recvfrom again
-			if (delayedAckPending) { // send out a delayed ACK
+		// if timeout, try to recvfrom again
+		if (r == RECV_TIMEOUT) {
+			// send out a delayed ACK for last successful packet
+			if (delayedAckPending) {
+				ackToSend = incSeqNum(packetReceived.seqNum, packetReceived.data.size());
+				delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
 				cout << "sending ACK:" << endl;
 				packetToSend.dump();
 				delayedAck.sendto(sockfd, &si_server, serverLen);
@@ -162,6 +166,7 @@ int main(int argc, char **argv)
 		}
 
 		// else, r == RECV_SUCCESS
+		delayedAckPending = true; // send a delayed ACK if next recvfrom times out
 		cout << "receiving data:" << endl;
 		packetReceived.dump();
 
@@ -178,20 +183,11 @@ int main(int argc, char **argv)
 		if (delayedAckPending) {
 			ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
 			delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-			delayedAckPending = true;
-
 			cout << "sending ACK:" << endl;
 			packetToSend.dump();
 			delayedAck.sendto(sockfd, &si_server, serverLen);
 			delayedAckPending = false;
 		}
-		else {
-			/* prepare delayed ACK */
-			ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
-			delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-			delayedAckPending = true;
-		}
-
 	}
 
  
