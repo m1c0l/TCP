@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <chrono>
 #include <future>
+#include <deque>
 
 #include "Utils.h"
 #include "TcpMessage.h"
@@ -145,28 +146,27 @@ int main(int argc, char **argv)
 
 	ofstream outFile(OUTPUT_FILE);
 
-	TcpMessage delayedAck;
-	bool delayedAckPending = false;
+	TcpMessage dataAck;
+
+	// store the out-of-order packets in case we get in order packets
+	deque<TcpMessage> outOfOrderPkts;
+	// first data packet's sequence number we should receive
+	uint16_t nextInOrderSeq = ackToSend;
 
 	while (true) {
 		/* receive data packet */
 		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
 		// if timeout, try to recvfrom again
 		if (r == RECV_TIMEOUT) {
-			// send out a delayed ACK for last successful packet
-			if (delayedAckPending) {
-				ackToSend = incSeqNum(packetReceived.seqNum, packetReceived.data.size());
-				delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-				cout << "sending ACK:" << endl;
-				packetToSend.dump();
-				delayedAck.sendto(sockfd, &si_server, serverLen);
-				delayedAckPending = false;
-			}
+			ackToSend = incSeqNum(packetReceived.seqNum, packetReceived.data.size());
+			dataAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
+			cout << "sending ACK:" << endl;
+			packetToSend.dump();
+			dataAck.sendto(sockfd, &si_server, serverLen);
 			continue;
 		}
 
 		// else, r == RECV_SUCCESS
-		delayedAckPending = true; // send a delayed ACK if next recvfrom times out
 		cout << "receiving data:" << endl;
 		packetReceived.dump();
 
@@ -174,20 +174,68 @@ int main(int argc, char **argv)
 		if (packetReceived.getFlag('F'))
 			break;
 
-		// save data to file
-		const char *data = packetReceived.data.c_str();
 		streamsize dataSize = packetReceived.data.size();
-		outFile.write(data, dataSize);
-
-		// send cumulative ACK if a delayed ACK is pending
-		if (delayedAckPending) {
-			ackToSend = incSeqNum(packetReceived.seqNum, dataSize);
-			delayedAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-			cout << "sending ACK:" << endl;
-			packetToSend.dump();
-			delayedAck.sendto(sockfd, &si_server, serverLen);
-			delayedAckPending = false;
+		uint16_t seqReceived = packetReceived.seqNum;
+		if (seqReceived == nextInOrderSeq) { 
+			cout << "Received in order packet!\n";
+			// save data to file
+			const char *data = packetReceived.data.c_str();
+			outFile.write(data, dataSize);
+			// update the next expected sequence number, increase by data size we got
+			nextInOrderSeq = incSeqNum(nextInOrderSeq, dataSize);
+			streamsize nextDataSize = dataSize;
+			// loop through saved OoO packets to see if they're next in order
+			while (outOfOrderPkts.size()) {
+				uint16_t nextSeq = outOfOrderPkts[0].seqNum;
+				// first packet in deque is the next one! pop it off and keep going
+				if (nextSeq == nextInOrderSeq) {
+					data = outOfOrderPkts[0].data.c_str();
+					outFile.write(data, nextDataSize);
+					// update next expected sequence number
+					nextDataSize = outOfOrderPkts[0].data.size();
+					nextInOrderSeq = incSeqNum(nextInOrderSeq, nextDataSize);
+					outOfOrderPkts.pop_front();
+				}
+				else {
+					break;
+				}
+			}
 		}
+		else {
+			// out of order, store it for later
+			unsigned currVecSize = outOfOrderPkts.size();
+			// no OoO packets yet
+			if (!currVecSize) {
+				outOfOrderPkts.push_back(packetReceived);
+			}
+			// received packet belongs after all other OoO packets
+			// if its seqNum >= the last packet's seqNum + data size
+			// do this first in case the seq #'s wrapped around
+			else if (seqReceived >= incSeqNum(outOfOrderPkts.back().seqNum, outOfOrderPkts.back().data.size())) {
+				outOfOrderPkts.push_back(packetReceived);
+			}
+			// received packet belongs before all other OoO packets
+			// if its seqNum < first packet's seqNum
+			else if (seqReceived < outOfOrderPkts[0].seqNum) {
+				outOfOrderPkts.push_front(packetReceived);
+			}
+			// else, received packet belongs in b/w two of the OoO packets
+			else {
+				for (unsigned i = 1; i < currVecSize; i++) {
+					// received packet's seqNum is >= the first packet's seqNum + data size and < second packet's seqNum
+					// TODO: fix this for case where seq #'s wrap around
+					if (seqReceived >= incSeqNum(outOfOrderPkts[i - 1].seqNum, outOfOrderPkts[i - 1].data.size()) && seqReceived < outOfOrderPkts[i].seqNum) {
+						outOfOrderPkts.insert(outOfOrderPkts.begin() + i, packetReceived);
+						break;
+					}
+				}
+			}
+		}
+		ackToSend = nextInOrderSeq; 
+		dataAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
+		cout << "sending ACK:" << endl;
+		dataAck.dump();
+		dataAck.sendto(sockfd, &si_server, serverLen);
 	}
 
  
