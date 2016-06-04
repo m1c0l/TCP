@@ -183,57 +183,91 @@ int main(int argc, char **argv)
 
 		streamsize dataSize = packetReceived.data.size();
 		uint16_t seqReceived = packetReceived.seqNum;
-		if (seqReceived == nextInOrderSeq) { 
-			cout << "Received in order packet!\n";
-			// save data to file
-			const char *data = packetReceived.data.c_str();
-			outFile.write(data, dataSize);
-			// update the next expected sequence number, increase by data size we got
-			nextInOrderSeq = incSeqNum(nextInOrderSeq, dataSize);
-			streamsize nextDataSize = dataSize;
-			// loop through saved OoO packets to see if they're next in order
-			while (outOfOrderPkts.size()) {
-				uint16_t nextSeq = outOfOrderPkts[0].seqNum;
-				// first packet in deque is the next one! pop it off and keep going
-				if (nextSeq == nextInOrderSeq) {
-					data = outOfOrderPkts[0].data.c_str();
-					outFile.write(data, nextDataSize);
-					// update next expected sequence number
-					nextDataSize = outOfOrderPkts[0].data.size();
-					nextInOrderSeq = incSeqNum(nextInOrderSeq, nextDataSize);
-					outOfOrderPkts.pop_front();
-				}
-				else {
-					break;
-				}
-			}
+		bool shouldDropPkt = false;
+		// check if packet's within window boundary; if not, drop packet
+		uint16_t windowMaxSeq = incSeqNum(nextInOrderSeq, recvWindowToSend);
+		if (windowMaxSeq > nextInOrderSeq) {
+			// no wrap around
+			shouldDropPkt = seqReceived < nextInOrderSeq || seqReceived > windowMaxSeq;
 		}
 		else {
-			// out of order, store it for later
-			unsigned currVecSize = outOfOrderPkts.size();
-			// no OoO packets yet
-			if (!currVecSize) {
-				outOfOrderPkts.push_back(packetReceived);
-			}
-			// received packet belongs after all other OoO packets
-			// if its seqNum >= the last packet's seqNum + data size
-			// do this first in case the seq #'s wrapped around
-			else if (seqReceived >= incSeqNum(outOfOrderPkts.back().seqNum, outOfOrderPkts.back().data.size())) {
-				outOfOrderPkts.push_back(packetReceived);
-			}
-			// received packet belongs before all other OoO packets
-			// if its seqNum < first packet's seqNum
-			else if (seqReceived < outOfOrderPkts[0].seqNum) {
-				outOfOrderPkts.push_front(packetReceived);
-			}
-			// else, received packet belongs in b/w two of the OoO packets
-			else {
-				for (unsigned i = 1; i < currVecSize; i++) {
-					// received packet's seqNum is >= the first packet's seqNum + data size and < second packet's seqNum
-					// TODO: fix this for case where seq #'s wrap around
-					if (seqReceived >= incSeqNum(outOfOrderPkts[i - 1].seqNum, outOfOrderPkts[i - 1].data.size()) && seqReceived < outOfOrderPkts[i].seqNum) {
-						outOfOrderPkts.insert(outOfOrderPkts.begin() + i, packetReceived);
+			// wrap around
+			shouldDropPkt = seqReceived > windowMaxSeq && seqReceived < nextInOrderSeq;
+		}
+		if (shouldDropPkt) {
+			cout << "Received pkt not w/in window!\n";
+		}
+		if (!shouldDropPkt) {
+			if (seqReceived == nextInOrderSeq) { 
+				cout << "Received in order packet!\n";
+				// save data to file
+				const char *data = packetReceived.data.c_str();
+				outFile.write(data, dataSize);
+				// update the next expected sequence number, increase by data size we got
+				nextInOrderSeq = incSeqNum(nextInOrderSeq, dataSize);
+				streamsize nextDataSize = dataSize;
+				// loop through saved OoO packets to see if they're next in order
+				while (outOfOrderPkts.size()) {
+					uint16_t nextSeq = outOfOrderPkts[0].seqNum;
+					// first packet in deque is the next one! pop it off and keep going
+					if (nextSeq == nextInOrderSeq) {
+						cout << "Popping OoO packet w/ seq num " << nextSeq << '\n';
+						data = outOfOrderPkts[0].data.c_str();
+						outFile.write(data, nextDataSize);
+						// update next expected sequence number
+						nextDataSize = outOfOrderPkts[0].data.size();
+						nextInOrderSeq = incSeqNum(nextInOrderSeq, nextDataSize);
+						outOfOrderPkts.pop_front();
+					}
+					else {
 						break;
+					}
+				}
+			}
+			else {
+				// out of order, store it for later
+				cout << "Received out of order packet!\n";
+				unsigned currVecSize = outOfOrderPkts.size();
+				// no OoO packets yet
+				if (!currVecSize) {
+					cout << "OoO list was empty, this is only OoO packet\n";
+					outOfOrderPkts.push_back(packetReceived);
+				}
+				// received packet belongs after all other OoO packets
+				// if its seqNum >= the last packet's seqNum + data size
+				// do this first in case the seq #'s wrapped around
+				else if (seqReceived >= incSeqNum(outOfOrderPkts.back().seqNum, outOfOrderPkts.back().data.size())) {
+					outOfOrderPkts.push_back(packetReceived);
+					cout << "OoO packet pushed to end of list\n";
+				}
+				// received packet belongs before all other OoO packets
+				// if its seqNum < first packet's seqNum
+				else if (seqReceived < outOfOrderPkts[0].seqNum) {
+					outOfOrderPkts.push_front(packetReceived);
+					cout << "OoO packet inserted at front of list\n";
+				}
+				// else, received packet belongs in b/w two of the OoO packets
+				else {
+					for (unsigned i = 0; i < currVecSize; i++) {
+						uint16_t currSeq = outOfOrderPkts[i].seqNum;
+						if (seqReceived == currSeq) {
+							// already got this data packet, ignore it
+							cout << "OoO packet discarded: seqNum " << currSeq << '\n';
+							shouldDropPkt = true;
+							break;
+						}
+					}
+					if (!shouldDropPkt) {
+						for (unsigned i = 1; i < currVecSize; i++) {
+							uint16_t currSeq = outOfOrderPkts[i].seqNum;
+							// received packet's seqNum is >= the first packet's seqNum + data size and < second packet's seqNum
+							// TODO: fix this for case where seq #'s wrap around
+							if (seqReceived >= incSeqNum(outOfOrderPkts[i - 1].seqNum, outOfOrderPkts[i - 1].data.size()) && seqReceived < currSeq) {
+								outOfOrderPkts.insert(outOfOrderPkts.begin() + i, packetReceived);
+								cout << "OoO packet inserted in middle at pos " << i << '\n';
+								break;
+							}
+						}
 					}
 				}
 			}
