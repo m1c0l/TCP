@@ -12,8 +12,8 @@ using namespace std;
 
 struct TcpMessage {
 public:
-	uint16_t seqNum = 0;
-	uint16_t ackNum = 0;
+	uint16_t seqNum = 55555;
+	uint16_t ackNum = 55555;
 	uint16_t recvWindow = 1034; //Double check this
 	uint16_t flags = 0;
 	string data = "";
