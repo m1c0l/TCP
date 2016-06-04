@@ -23,22 +23,27 @@ using namespace std;
 const float TIMEOUT = 0.5f; // seconds
 
 bool keepGettingAcks = true;
+uint16_t lastAckRecvd;
 
-void getAcksHelper(uint16_t &lastAck, uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
 	TcpMessage ack;
-	while (keepGettingAcks && lastAck != finalAck) {
+	while (keepGettingAcks && lastAckRecvd != finalAck) {
 		if (ack.recvfrom(sockfd, si_other, len) == RECV_SUCCESS) {
 			cout << "received ACK:" << endl;
 			ack.dump();
 		}
-		lastAck = ack.ackNum;
+		else {
+			cout << "no ACK received" << endl;
+		}
+		lastAckRecvd = ack.ackNum;
 	}
 }
 
 // Receive ACKs for 0.5 seconds and returns the latest ACK received
-void getAcks(uint16_t &lastAck, uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+void getAcks(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
 	chrono::milliseconds timer(500);
-	future<void> promise = async(launch::async, getAcksHelper, ref(lastAck), finalAck, sockfd, si_other, len);
+	keepGettingAcks = true;
+	future<void> promise = async(launch::async, getAcksHelper, finalAck, sockfd, si_other, len);
 	promise.wait_for(timer); // run for 0.5s
 	keepGettingAcks = false;
 }
@@ -89,7 +94,7 @@ int main(int argc, char **argv) {
 	bool sendFile = false;
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
-	uint16_t lastAckRecvd = seqToSend;
+	lastAckRecvd = seqToSend;
 	uint16_t clientRecvWindow; // Set this each time client sends packet
 	ifstream wantedFile;
 	int packsToSend;
@@ -222,8 +227,7 @@ int main(int argc, char **argv) {
 
 	// receive ACKs and retransmit until all packets ACKed
 	while (true) {
-		cerr << "loop\n";
-		getAcks(lastAckRecvd, lastAckExpected, sockfd, &other, other_length);
+		getAcks(lastAckExpected, sockfd, &other, other_length);
 		// all packets acked
 		if (lastAckRecvd == lastAckExpected) {
 			break;
