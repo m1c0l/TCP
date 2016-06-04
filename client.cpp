@@ -289,6 +289,50 @@ int main(int argc, char **argv)
 			exit(1);
 	}*/
 
+	/* Send FIN-ACK for the FIN received earlier */
+	// seq # stays same b/c no payload
+	ackToSend = incSeqNum(packetReceived.seqNum, 1);
+	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
+	packetToSend.sendto(sockfd, &si_server, serverLen);
+	cout << "Sending FIN-ACK to server\n";
+	packetToSend.dump();
+
+	/* receive packets until a FIN-ACK is received from server */
+	while (true) {
+
+		/* Send FIN; seq # stays same b/c no payload */
+		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
+		packetToSend.sendto(sockfd, &si_server, serverLen);
+		cout << "Sending FIN to server\n";
+		packetToSend.dump();
+
+		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
+		if (r == RECV_TIMEOUT) {
+			continue;
+		}
+		switch(packetReceived.flags) {
+			// server resends FIN
+			case FIN_FLAG:
+				/* Send FIN-ACK */
+				ackToSend = incSeqNum(packetReceived.seqNum, 1);
+				packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
+				packetToSend.sendto(sockfd, &si_server, serverLen);
+				cout << "Sending FIN-ACK to server\n";
+				packetToSend.dump();
+				break;
+
+			// get FIN-ACK; can exit now
+			case ACK_FLAG:
+				break;
+
+			default:
+				cerr << "Received packet wasn't FIN-ACK or FIN!\n";
+				//exit(1);
+
+		}
+	}
+
+
 	/* Send FIN-ACK; seq # stays same b/c no payload*/
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
