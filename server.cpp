@@ -261,40 +261,65 @@ int main(int argc, char **argv) {
 	*/
 
 	bool hasReceivedFin = false;
-	while (!hasReceivedFin) {
+	bool hasReceivedFinAck = false;
+	int timedWaitTimer = 2 * MAX_SEG_LIFETIME; // milliseconds to wait before closing
+	while (timedWaitTimer > 0) {
 
-		/* send FIN */
+		/* send FIN if no FIN-ACK received yet */
+		if (!hasReceivedFinAck) {
+			flagsToSend = "F";
+			// Sequence number shouldn't change since we already increased by total data size
+			ackToSend = 0; // ACK is invalid this packet
+			toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
+			toSend.sendto(sockfd, &other, other_length);
+			cout << "Sending FIN\n";
+			toSend.dump();
+		}
 
-		flagsToSend = "F";
-		// Sequence number shouldn't change since we already increased by total data size
-		ackToSend = 0; // ACK is invalid this packet
-		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
-		toSend.sendto(sockfd, &other, other_length);
-		cout << "Sending FIN\n";
-		toSend.dump();
+		/* timed wait timer counts down after FIN received */
+		if (hasReceivedFin) {
+			timedWaitTimer -= TIMEOUT; // wait TIMEOUT msec each loop
+		}
 
-		/* Should receive FIN-ACK from client */
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
-			cout << "Timeout while waiting for FIN-ACK\n";
+			cout << "Timeout while waiting for FIN-ACK/FIN\n";
 			continue;
 		}
 		switch(received.flags) {
+			// FIN-ACK
 			case FIN_FLAG | ACK_FLAG:
 				// TODO: success
 				cout << "Received FIN-ACK\n";
-				hasReceivedFin = true;
+				hasReceivedFinAck = true;
 				break;
+
+			// FIN
+			case FIN_FLAG:
+				cout << "Received FIN\n";
+				hasReceivedFin = true;
+
+				flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
+				seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
+				ackToSend = incSeqNum(received.seqNum, 1); // increase ack by 1
+				toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
+				toSend.sendto(sockfd, &other, other_length);
+				cout << "Sending ACK of FIN\n";
+				toSend.dump();
+				cerr << "Server received FIN; starting timed wait..." << endl;
+				break;
+
 			default:
-				cerr << "FIN-ACK wasn't received in packet!\n";
+				cerr << "Received packet wasn't FIN-ACK or FIN!\n";
 				//exit(1);
 		}
 		received.dump();
 	}
 
-	hasReceivedFin = false;
-	while (!hasReceivedFin) {
+	//hasReceivedFin = false;
+	//while (!hasReceivedFin) {
 		/* Should receive FIN from client */
+	/*
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
 			cout << "Timeout while waiting for FIN\n";
@@ -312,14 +337,7 @@ int main(int argc, char **argv) {
 		}
 		received.dump();
 	}
-
-	flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
-	seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
-	ackToSend = incSeqNum(received.seqNum, 1); // increase ack by 1
-	toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
-	toSend.sendto(sockfd, &other, other_length);
-	cout << "Sending ACK of FIN\n";
-	toSend.dump();
+	*/
 
 	cout << "Shouldn't receive anything else from client now\n";
 	//received.recvfrom(sockfd, &other, other_length);

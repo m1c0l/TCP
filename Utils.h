@@ -18,6 +18,7 @@ const int RECV_SUCCESS = 1;
 const int RECV_TIMEOUT = 2;
 
 const int TIMEOUT = 500; // milliseconds
+const int MAX_SEG_LIFETIME = 60 * 1000; // milliseconds
 
 uint16_t incSeqNum(uint16_t seq, uint16_t increment);
 
