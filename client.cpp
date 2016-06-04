@@ -167,14 +167,9 @@ int main(int argc, char **argv)
 		/* receive data packet */
 		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
 		// if timeout, try to recvfrom again
-		/*if (r == RECV_TIMEOUT) {
-			ackToSend = incSeqNum(packetReceived.seqNum, packetReceived.data.size());
-			dataAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-			cout << "sending ACK:" << endl;
-			packetToSend.dump();
-			dataAck.sendto(sockfd, &si_server, serverLen);
+		if (r == RECV_TIMEOUT) {
 			continue;
-		}*/
+		}
 
 		// else, r == RECV_SUCCESS
 		cout << "receiving data:" << endl;
