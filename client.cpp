@@ -297,8 +297,8 @@ int main(int argc, char **argv)
 	cout << "Sending FIN-ACK to server\n";
 	packetToSend.dump();
 
-	/* receive packets until a FIN-ACK is received from server */
-	while (true) {
+	bool hasReceivedAck = false; /* receive packets until a FIN-ACK is received from server */
+	while (!hasReceivedAck) {
 
 		/* Send FIN; seq # stays same b/c no payload */
 		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
@@ -314,6 +314,7 @@ int main(int argc, char **argv)
 			// server resends FIN
 			case FIN_FLAG:
 				/* Send FIN-ACK */
+				cout << "Received FIN\n";
 				ackToSend = incSeqNum(packetReceived.seqNum, 1);
 				packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 				packetToSend.sendto(sockfd, &si_server, serverLen);
@@ -323,6 +324,8 @@ int main(int argc, char **argv)
 
 			// get FIN-ACK; can exit now
 			case ACK_FLAG:
+				cout << "Received ACK of FIN! Closing connection.\n";
+				hasReceivedAck = true;
 				break;
 
 			default:
@@ -333,20 +336,20 @@ int main(int argc, char **argv)
 	}
 
 
-	/* Send FIN-ACK; seq # stays same b/c no payload*/
+	/* // Send FIN-ACK; seq # stays same b/c no payload
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 	cout << "Sending FIN-ACK to server\n";
 	packetToSend.dump();
 	
-	/* Send FIN; seq # stays same b/c no payload */
+	// Send FIN; seq # stays same b/c no payload //
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 	cout << "Sending FIN to server\n";
 	packetToSend.dump();
 
-    /* Receive ACK of FIN without the FIN flag from server */ 
+    // Receive ACK of FIN without the FIN flag from server
 	packetReceived.recvfrom(sockfd, &si_server, serverLen);
 	switch (packetReceived.flags) {
 		case ACK_FLAG:
@@ -357,7 +360,8 @@ int main(int argc, char **argv)
 			cerr << "ACK of FIN wasn't received from server!\n";
 			exit(1);
 	}
-	packetReceived.dump();
+	packetReceived.dump();*/
+
 	close(sockfd);
 	outFile.close();
 	return 0;

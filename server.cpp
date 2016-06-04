@@ -306,7 +306,7 @@ int main(int argc, char **argv) {
 				toSend.sendto(sockfd, &other, other_length);
 				cout << "Sending ACK of FIN\n";
 				toSend.dump();
-				cerr << "Server received FIN; starting timed wait..." << endl;
+				cout << "Server received FIN; starting timed wait..." << endl;
 				break;
 
 			default:
