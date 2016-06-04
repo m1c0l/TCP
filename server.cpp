@@ -20,7 +20,6 @@
 
 using namespace std;
 
-const float TIMEOUT = 0.5f; // seconds
 
 bool keepGettingAcks = true;
 uint16_t lastAckRecvd;
@@ -41,7 +40,7 @@ void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen
 
 // Receive ACKs for 0.5 seconds and returns the latest ACK received
 void getAcks(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
-	chrono::milliseconds timer(500);
+	chrono::milliseconds timer(TIMEOUT);
 	keepGettingAcks = true;
 	future<void> promise = async(launch::async, getAcksHelper, finalAck, sockfd, si_other, len);
 	promise.wait_for(timer); // run for 0.5s
@@ -121,7 +120,7 @@ int main(int argc, char **argv) {
 			// Only want to run this code once
 			timeval recvTimeout;
 			recvTimeout.tv_sec = 0;
-			recvTimeout.tv_usec = 500000;
+			recvTimeout.tv_usec = TIMEOUT * 1000;
 
 			if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
 				perror("setsockopt");

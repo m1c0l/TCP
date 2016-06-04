@@ -17,6 +17,8 @@ const uint16_t ACK_FLAG = 4;
 const int RECV_SUCCESS = 1;
 const int RECV_TIMEOUT = 2;
 
+const int TIMEOUT = 500; // milliseconds
+
 uint16_t incSeqNum(uint16_t seq, uint16_t increment);
 
 #endif
