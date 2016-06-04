@@ -133,6 +133,10 @@ int main(int argc, char **argv)
 				cout << "Server responded, but without syn-ack!\n";
 				//exit(1);
 			}
+			if (packetReceived.ackNum != incSeqNum(seqToSend, 1)) {
+				cerr << "SYN-ACK has wrong ack number; drop packet" << endl;
+				continue;
+			}
 			break;
 		}
 	}
