@@ -111,24 +111,30 @@ int main(int argc, char **argv)
 	TcpMessage packetToSend, packetReceived;
 
 
-	/* send SYN */
+	/* handshake */
+	while (true) {
+		/* send SYN */
+		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "S");
+		cout << "sending SYN:" << endl;
+		packetToSend.dump();
+		packetToSend.sendto(sockfd, &si_server, serverLen);
 
-	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "S");
-	cout << "sending SYN:" << endl;
-	packetToSend.dump();
-	packetToSend.sendto(sockfd, &si_server, serverLen);
-
-
-	/* receive SYN-ACK */
-
-	packetReceived.recvfrom(sockfd, &si_server, serverLen);
-	cout << "receiving SYN-ACK:" << endl;
-	packetReceived.dump();
-	if (!packetReceived.getFlag('a') || !packetReceived.getFlag('s')) {
-		// error: server responded, but without syn-ack
-		// TODO
-		cout << "Server responded, but without syn-ack!\n";
-		//exit(1);
+		/* receive SYN-ACK */
+		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
+		if (r == RECV_TIMEOUT) {
+			continue; // resend SYN
+		}
+		else {
+			cout << "receiving SYN-ACK:" << endl;
+			packetReceived.dump();
+			if (!packetReceived.getFlag('a') || !packetReceived.getFlag('s')) {
+				// error: server responded, but without syn-ack
+				// TODO
+				cout << "Server responded, but without syn-ack!\n";
+				//exit(1);
+			}
+			break;
+		}
 	}
 
 
@@ -141,6 +147,7 @@ int main(int argc, char **argv)
 	packetToSend.dump();
 	packetToSend.sendto(sockfd, &si_server, serverLen);
 
+	//return 0;
 
 	/* receive data */
 

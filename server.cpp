@@ -97,7 +97,10 @@ int main(int argc, char **argv) {
 	string flagsToSend = "";
 	for (int packetsSent = 0; true; packetsSent++) {
 	    cout << "Waiting for something" << endl;
-		received.recvfrom(sockfd, &other, other_length);
+		int r = received.recvfrom(sockfd, &other, other_length);
+		if (r == RECV_TIMEOUT) {
+			continue;
+		}
 
 		cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cout << "Received:" << endl;
@@ -163,6 +166,8 @@ int main(int argc, char **argv) {
 		cout << "Handshake: sending packet\n";
 		toSend.dump();
 	}
+
+	//return 0;
 	
 	char filebuf[DATA_SIZE];
 	wantedFile.open(filename);
@@ -224,8 +229,8 @@ int main(int argc, char **argv) {
 				 << " not in packetsInWindow" << '\n';
 		}
 		else {
-			cout << "Retransmitting:" << endl;
-			packetsInWindow[lastAckRecvd].dump();
+			cout << "Retransmitting: " << lastAckRecvd << endl;
+			//packetsInWindow[lastAckRecvd].dump();
 			packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
 		}
 	}
