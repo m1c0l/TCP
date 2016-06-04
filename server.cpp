@@ -260,43 +260,58 @@ int main(int argc, char **argv) {
 	}
 	*/
 
-	/* send FIN */
+	bool hasReceivedFin = false;
+	while (!hasReceivedFin) {
 
-	flagsToSend = "F";
-	// Sequence number shouldn't change since we already increased by total data size
-	//seqToSend = received.ackNum;
-	//ackToSend = received.seqNum;
-	ackToSend = 0; // ACK is invalid this packet
-	toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
-	toSend.sendto(sockfd, &other, other_length);
-	cout << "Sending FIN\n";
-	toSend.dump();
+		/* send FIN */
 
-	/* Should receive FIN-ACK from client */
-	received.recvfrom(sockfd, &other, other_length);
-	switch(received.flags) {
-		case FIN_FLAG | ACK_FLAG:
-			// TODO: success
-			cout << "Received FIN-ACK\n";
-			break;
-		default:
-			cerr << "FIN-ACK wasn't received!\n";
-			//exit(1);
+		flagsToSend = "F";
+		// Sequence number shouldn't change since we already increased by total data size
+		ackToSend = 0; // ACK is invalid this packet
+		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
+		toSend.sendto(sockfd, &other, other_length);
+		cout << "Sending FIN\n";
+		toSend.dump();
+
+		/* Should receive FIN-ACK from client */
+		int r = received.recvfrom(sockfd, &other, other_length);
+		if (r == RECV_TIMEOUT) {
+			cout << "Timeout while waiting for FIN-ACK\n";
+			continue;
+		}
+		switch(received.flags) {
+			case FIN_FLAG | ACK_FLAG:
+				// TODO: success
+				cout << "Received FIN-ACK\n";
+				hasReceivedFin = true;
+				break;
+			default:
+				cerr << "FIN-ACK wasn't received in packet!\n";
+				//exit(1);
+		}
+		received.dump();
 	}
-	received.dump();
 
-	/* Should receive FIN from client */
-	received.recvfrom(sockfd, &other, other_length);
-	switch(received.flags) {
-		case FIN_FLAG:
-			// TODO: success
-			cout << "Received FIN\n";
-			break;
-		default:
-			cerr << "FIN wasn't received!\n";
-			//exit(1);
+	hasReceivedFin = false;
+	while (!hasReceivedFin) {
+		/* Should receive FIN from client */
+		int r = received.recvfrom(sockfd, &other, other_length);
+		if (r == RECV_TIMEOUT) {
+			cout << "Timeout while waiting for FIN\n";
+			continue;
+		}
+		switch(received.flags) {
+			case FIN_FLAG:
+				// TODO: success
+				cout << "Received FIN\n";
+				hasReceivedFin = true;
+				break;
+			default:
+				cerr << "FIN wasn't received!\n";
+				//exit(1);
+		}
+		received.dump();
 	}
-	received.dump();
 
 	flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
 	seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
