@@ -99,6 +99,11 @@ int main(int argc, char **argv) {
 	    cout << "Waiting for something" << endl;
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
+			if (hasReceivedSyn) { // client ACK not received; resend SYN-ACK
+				toSend.sendto(sockfd, &other, other_length);
+				cout << "Sending SYN-ACK (retransmit):" << endl;
+				toSend.dump();
+			}
 			continue;
 		}
 
