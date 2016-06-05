@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
 	bool sendFile = false;
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
-	lastAckRecvd = seqToSend;
+	lastAckRecvd = seqToSend + 1;
 	ifstream wantedFile;
 	int packsToSend;
 	int pktSent = 0;
@@ -237,6 +237,7 @@ int main(int argc, char **argv) {
 	uint16_t unwantedAck = seqToSend;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
 	while(true){
 	   
+	    unwantedAck = lastAckRecvd;
 	    dynWindowStartSeq = incSeqNum(windowStartSeq, DATA_SIZE * cwndBot);
 	    for(filepkts =  cwndToSend; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
 
@@ -271,15 +272,14 @@ int main(int argc, char **argv) {
 	    // We successfully received an ack, so we increase the window size by 1 and move it
 	    if (getAckTimedOut){
 		//No ACKS received so we have to retransmitt
-		cout << "Retransmitting: " << lastAckRecvd << endl;
-		ssThresh = (cwndTop-cwndBot)/2;
+		cout << "Retransmitting (timeout): " << lastAckRecvd << endl;
+		ssThresh = (cwndTop-cwndBot+1)/2;
 		cwndToSend = cwndBot;
 		cwndTop = cwndBot+1;
 		congAvoidanceFlag = 0;
 		//seqToSend = (seqToSend + MAX_SEQ_NUM -  bytesToGet) % MAX_SEQ_NUM;
 		seqToSend = lastAckRecvd;
 		wantedFile.seekg(cwndBot * DATA_SIZE, ios::beg);
-		unwantedAck = lastAckRecvd;
 		continue;
 
 	    }
@@ -307,7 +307,6 @@ int main(int argc, char **argv) {
 		cwndBot+=(1 + (lastAckRecvd-lastAckExpected)/DATA_SIZE);
 		cwndTop+=(2 + 2*(lastAckRecvd-lastAckExpected)/DATA_SIZE);
 		 
-		unwantedAck = lastAckRecvd;
 		if(cwndTop - cwndBot >= ssThresh){
 		    congAvoidanceFlag=1;
 		    congAvoidValue = cwndTop+1;
@@ -328,13 +327,12 @@ int main(int argc, char **argv) {
 		cout << "Retransmitting: " << lastAckRecvd << endl;
 		//packetsInWindow[lastAckRecvd].dump();
 		//packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
-		ssThresh = (cwndTop-cwndBot)/2;
+		ssThresh = (cwndTop-cwndBot+1)/2;
 		cwndToSend = cwndBot;
 		cwndTop = cwndBot+1;
 		congAvoidanceFlag = 0;
 		seqToSend = lastAckRecvd;
 		wantedFile.seekg(cwndBot * DATA_SIZE, ios::beg);
-		unwantedAck = lastAckRecvd;
 	    }
 	}
 	
