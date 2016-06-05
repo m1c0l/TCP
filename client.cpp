@@ -83,7 +83,10 @@ int main(int argc, char **argv)
     }
 
 	// Set receive timeout of 0.5 s
-	setSocketTimeout(sockfd, 0, TIMEOUT * 1000);
+	timeval recvTimeval;
+	recvTimeval.tv_sec = 0;
+	recvTimeval.tv_usec = TIMEOUT * 1000;
+	setSocketTimeout(sockfd, recvTimeval);
  
     sockaddr_in si_server;
     memset((char *) &si_server, 0, sizeof(si_server));
@@ -101,6 +104,7 @@ int main(int argc, char **argv)
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = INIT_RECV_WINDOW;
 	TcpMessage packetToSend, packetReceived;
+	uint16_t synAckSeq;
 
 
 	/* handshake */
@@ -129,26 +133,23 @@ int main(int argc, char **argv)
 				cerr << "SYN-ACK has wrong ack number; drop packet" << endl;
 				continue;
 			}
+			synAckSeq = packetReceived.seqNum;
 			break;
 		}
 	}
 
-
-	/* send ACK */
-
+	// seq/ack for client's ACK for handshake
 	seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
+	uint16_t handshakeSeq = seqToSend;
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
-	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-	cout << "sending ACK:" << endl;
-	packetToSend.dump();
-	packetToSend.sendto(sockfd, &si_server, serverLen);
+	uint16_t handshakeAck = ackToSend;
 
 	//return 0;
 
 	/* receive data */
 
 	ofstream outFile(OUTPUT_FILE);
-
+	bool handshakeComplete = false;
 	TcpMessage dataAck;
 
 	// store the out-of-order packets in case we get in order packets
@@ -157,12 +158,25 @@ int main(int argc, char **argv)
 	uint16_t nextInOrderSeq = ackToSend;
 
 	while (true) {
+		/* send handshake ACK */
+		if (!handshakeComplete) {
+			packetToSend = TcpMessage(handshakeSeq, handshakeAck, recvWindowToSend, "A");
+			cout << "sending ACK:" << endl;
+			packetToSend.dump();
+			packetToSend.sendto(sockfd, &si_server, serverLen);
+		}
+
 		/* receive data packet */
 		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
 		// if timeout, try to recvfrom again
 		if (r == RECV_TIMEOUT) {
 			continue;
 		}
+		// if duplicate SYN-ACK, resend handshake ACK
+		if (packetReceived.seqNum == synAckSeq) {
+			continue;
+		}
+		handshakeComplete = true; // done with handshake if this is a data pkt
 
 		// else, r == RECV_SUCCESS
 		cout << "receiving data:" << endl;

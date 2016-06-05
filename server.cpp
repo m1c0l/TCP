@@ -118,7 +118,10 @@ int main(int argc, char **argv) {
 		if (!packetsSent) {
 			// Set receive timeout of 0.5s
 			// Only want to run this code once
-			setSocketTimeout(sockfd, 0, TIMEOUT * 1000);
+			timeval recvTimeval;
+			recvTimeval.tv_sec = 0;
+			recvTimeval.tv_usec = TIMEOUT * 1000;
+			setSocketTimeout(sockfd, recvTimeval);
 		}
 
 
