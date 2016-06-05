@@ -210,10 +210,11 @@ int main(int argc, char **argv)
 					// first packet in deque is the next one! pop it off and keep going
 					if (nextSeq == nextInOrderSeq) {
 						cout << "Popping OoO packet w/ seq num " << nextSeq << '\n';
+						// get the OoO packet's data and data size, write to disk
 						data = outOfOrderPkts[0].data.c_str();
+						nextDataSize = outOfOrderPkts[0].data.size();
 						outFile.write(data, nextDataSize);
 						// update next expected sequence number
-						nextDataSize = outOfOrderPkts[0].data.size();
 						nextInOrderSeq = incSeqNum(nextInOrderSeq, nextDataSize);
 						outOfOrderPkts.pop_front();
 					}
