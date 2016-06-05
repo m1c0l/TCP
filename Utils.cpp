@@ -10,6 +10,16 @@ uint16_t incSeqNum(uint16_t seq, uint16_t increment) {
 	return (seq + increment) % MAX_SEQ_NUM;
 }
 
+// returns true if seq is within the range, counting for wraparound
+bool inWindow(uint16_t seq, uint16_t bot, uint16_t top) {
+	if (bot < top) { // no wraparound
+		return seq >= bot && seq <= top;
+	}
+	else { // wraps around
+		return seq <= top || seq >= bot;
+	}
+}
+
 // from GNU docs
 /* Subtract the ‘struct timeval’ values X and Y,
    storing the result in RESULT.

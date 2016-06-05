@@ -22,6 +22,7 @@ const int TIMEOUT = 500; // milliseconds
 const int MAX_SEG_LIFETIME = 60 * 1000; // milliseconds
 
 uint16_t incSeqNum(uint16_t seq, uint16_t increment);
+bool inWindow(uint16_t seq, uint16_t bot, uint16_t top);
 void setSocketTimeout(int sockfd, timeval tv);
 timeval now();
 timeval timeRemaining(timeval start);
