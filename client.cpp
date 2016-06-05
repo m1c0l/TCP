@@ -199,13 +199,15 @@ int main(int argc, char **argv)
 		handshakeComplete = true; // done with handshake if this is a data pkt
 
 		// else, r == RECV_SUCCESS
-		printRecv("data", packetReceived.seqNum);
 		cerr << "receiving data:" << endl;
 		packetReceived.dump();
 
 		// FIN received
-		if (packetReceived.getFlag('F'))
+		if (packetReceived.getFlag('F')) {
+			printRecv("FIN", packetReceived.seqNum);
 			break;
+		}
+		printRecv("data", packetReceived.seqNum);
 
 		streamsize dataSize = packetReceived.data.size();
 		uint16_t seqReceived = packetReceived.seqNum;

@@ -24,7 +24,13 @@ void printRecv(string pktType, uint16_t ack) {
 	cout << "Receiving " << pktType << " packet " << ack << '\n';
 }
 
-// TODO: printSend needs congestion window size and ssthresh
+void printSend(string pktType, uint16_t seq, int cwndPkts, int ssThresh, bool isRetransmit) {
+	cout << "Sending " << pktType << " packet " << seq << " " << cwndPkts * DATA_SIZE << " " << ssThresh;
+	if (isRetransmit) {
+		cout << " Retransmission";
+	}
+	cout << '\n';
+}
 
 bool keepGettingAcks = true;
 uint16_t lastAckRecvd;
@@ -114,6 +120,7 @@ int main(int argc, char **argv) {
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
 			if (hasReceivedSyn) { // client ACK not received; resend SYN-ACK
+				printSend("SYN-ACK", toSend.seqNum, 1, INT_MAX, true);
 				toSend.sendto(sockfd, &other, other_length);
 				cerr << "Sending SYN-ACK (retransmit):" << endl;
 				toSend.dump();
@@ -143,22 +150,24 @@ int main(int argc, char **argv) {
 		case SYN_FLAG:
 			printRecv("SYN", received.ackNum);
 		    if (hasReceivedSyn) {
-				cerr << "Multiple SYNs\n"; 
-				break;
+				cerr << "Got another SYN, sending SYN-ACK\n"; 
 			}
-		    hasReceivedSyn = true;
 		    flagsToSend ="SA";
+			printSend("SYN-ACK", seqToSend, 1, INT_MAX, hasReceivedSyn); 
+		    hasReceivedSyn = true;
 		   
 		    break;
 		
 		case SYN_FLAG | ACK_FLAG:
 		    cerr << "Both SYN and ACK were set by client\n";
+			// TODO: should we deal with this case?
 		    //exit(1);
 		    break;
 
 		case ACK_FLAG:
 			printRecv("ACK", received.ackNum);
 		    if (!hasReceivedSyn) {
+				// TODO: think about this case more
 				cerr << "ACK before handshake\n"; 
 				break;
 			}
@@ -237,9 +246,12 @@ int main(int argc, char **argv) {
 		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, "A");
 		toSend.data = string(filebuf, bytesToGet);
 	    
+		// if already in map, we're retransmitting
+		bool isRetransmit = packetsInWindow.count(toSend.seqNum);
 		// store packet in case retransmission needed
 		packetsInWindow[toSend.seqNum] = toSend;
 
+		printSend("data", toSend.seqNum, cwndTop - cwndBot, ssThresh, isRetransmit);
 		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
 		toSend.dump();
 		toSend.sendto(sockfd, &other, other_length);
