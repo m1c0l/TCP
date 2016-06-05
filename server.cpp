@@ -216,16 +216,20 @@ int main(int argc, char **argv) {
 	int congAvoidValue=cwndBot;
 	int ssThresh = INT_MAX;
 	int filepkts = 0;
-	bool randomBool = true;
+	//bool randomBool = true;
 	int bytesToGet = 0;
 	int windowStartSeq = seqToSend;
 	uint16_t lastAckExpected;
 	uint16_t unwantedAck = seqToSend;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
-	while(randomBool){
+	while(true){
 	   
+	    if(filepkts == packsToSend){
+		break; 
+		}
 	    for(filepkts =  cwndBot; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
 
 		memset(filebuf, 0, DATA_SIZE);
+		
 
 		//Read DATA_SIZE bytes normally, otherwise read the exact amount needed for the last packet
 		bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : DATA_SIZE;
