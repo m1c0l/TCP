@@ -225,8 +225,6 @@ int main(int argc, char **argv) {
 	uint16_t unwantedAck = seqToSend;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
 	while(true){
 	   
-	    if(lastAckRecvd == incSeqNum(windowStartSeq, bodyLength))
-		break;
 	    dynWindowStartSeq = incSeqNum(windowStartSeq, DATA_SIZE * cwndBot);
 	    for(filepkts =  cwndToSend; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
 
@@ -275,6 +273,7 @@ int main(int argc, char **argv) {
 		}
 		*/
 	    } else if (lastAckRecvd >= lastAckExpected || (lastAckRecvd < lastAckExpected && lastAckRecvd < dynWindowStartSeq)){//TODO: use receive window to check if packet is in window
+		cerr << "=========================================" << endl;
 		cwndToSend = cwndTop;
 		cwndBot+=(1 + (lastAckRecvd-lastAckExpected)/DATA_SIZE);
 		cwndTop+=(2 + 2*(lastAckRecvd-lastAckExpected)/DATA_SIZE);
@@ -286,6 +285,10 @@ int main(int argc, char **argv) {
 		}
 		continue;
 
+	    }
+	    // all packets ACKed
+	    if(lastAckRecvd == incSeqNum(windowStartSeq, bodyLength)) {
+		break;
 	    }
 	    // retransmit
 	    if (packetsInWindow.count(lastAckRecvd) == 0) {
