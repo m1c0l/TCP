@@ -29,6 +29,18 @@ int waitFor(future<T>& promise) {
 }
 */
 
+void printRecv(string pktType, uint16_t seq) {
+	cout << "Receiving " << pktType << " packet " << seq << '\n';
+}
+
+void printSend(string pktType, uint16_t ack, bool isRetransmit) {
+	cout << "Sending " << pktType << " packet " << ack;
+	if (isRetransmit) {
+		cout << " Retransmission";
+	}
+	cout << '\n';
+}
+
 #define OUTPUT_FILE "client-dump" // the file received and saved by the client
  
 int main(int argc, char **argv)
@@ -72,7 +84,7 @@ int main(int argc, char **argv)
 		exit(3);
 	}
 	ip = ipstr;
-	cout << "IP: " << ip << "\n";
+	cerr << "IP: " << ip << "\n";
 
 	srand (time(NULL)); //Used to generate random ISN
  
@@ -83,14 +95,10 @@ int main(int argc, char **argv)
     }
 
 	// Set receive timeout of 0.5 s
-	timeval recvTimeout;
-	recvTimeout.tv_sec = 0;
-	recvTimeout.tv_usec = TIMEOUT * 1000;
-
-	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
-		perror("setsockopt");
-		return 1;
-	}
+	timeval recvTimeval;
+	recvTimeval.tv_sec = 0;
+	recvTimeval.tv_usec = TIMEOUT * 1000;
+	setSocketTimeout(sockfd, recvTimeval);
  
     sockaddr_in si_server;
     memset((char *) &si_server, 0, sizeof(si_server));
@@ -108,13 +116,18 @@ int main(int argc, char **argv)
    	uint16_t ackToSend = 0;
 	uint16_t recvWindowToSend = INIT_RECV_WINDOW;
 	TcpMessage packetToSend, packetReceived;
+	uint16_t synAckSeq;
 
 
 	/* handshake */
+	bool hasResentSyn = false;
 	while (true) {
 		/* send SYN */
 		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "S");
-		cout << "sending SYN:" << endl;
+		printSend("SYN", seqToSend, hasResentSyn);
+		hasResentSyn = true; // set this to true so "retransmit" will print the 2nd time
+		// keep this cerr output for now, remove it later
+		cerr << "sending SYN:" << endl;
 		packetToSend.dump();
 		packetToSend.sendto(sockfd, &si_server, serverLen);
 
@@ -124,38 +137,36 @@ int main(int argc, char **argv)
 			continue; // resend SYN
 		}
 		else {
-			cout << "receiving SYN-ACK:" << endl;
+			printRecv("SYN-ACK", packetReceived.seqNum);
+			cerr << "receiving SYN-ACK:" << endl;
 			packetReceived.dump();
 			if (!packetReceived.getFlag('a') || !packetReceived.getFlag('s')) {
 				// error: server responded, but without syn-ack
 				// TODO
-				cout << "Server responded, but without syn-ack!\n";
+				cerr << "Server responded, but without syn-ack!\n";
 				//exit(1);
 			}
 			if (packetReceived.ackNum != incSeqNum(seqToSend, 1)) {
 				cerr << "SYN-ACK has wrong ack number; drop packet" << endl;
 				continue;
 			}
+			synAckSeq = packetReceived.seqNum;
 			break;
 		}
 	}
 
-
-	/* send ACK */
-
+	// seq/ack for client's ACK for handshake
 	seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
+	uint16_t handshakeSeq = seqToSend;
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
-	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-	cout << "sending ACK:" << endl;
-	packetToSend.dump();
-	packetToSend.sendto(sockfd, &si_server, serverLen);
+	uint16_t handshakeAck = ackToSend;
 
 	//return 0;
 
 	/* receive data */
 
 	ofstream outFile(OUTPUT_FILE);
-
+	bool handshakeComplete = false;
 	TcpMessage dataAck;
 
 	// store the out-of-order packets in case we get in order packets
@@ -164,15 +175,30 @@ int main(int argc, char **argv)
 	uint16_t nextInOrderSeq = ackToSend;
 
 	while (true) {
+		/* send handshake ACK */
+		if (!handshakeComplete) {
+			packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
+			printSend("ACK", seqToSend, false); // TODO: not false each time
+			cerr << "sending ACK:" << endl;
+			packetToSend.dump();
+			packetToSend.sendto(sockfd, &si_server, serverLen);
+		}
+
 		/* receive data packet */
 		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
 		// if timeout, try to recvfrom again
 		if (r == RECV_TIMEOUT) {
 			continue;
 		}
+		// if duplicate SYN-ACK, resend handshake ACK
+		if (packetReceived.seqNum == synAckSeq) {
+			continue;
+		}
+		handshakeComplete = true; // done with handshake if this is a data pkt
 
 		// else, r == RECV_SUCCESS
-		cout << "receiving data:" << endl;
+		printRecv("data", packetReceived.seqNum);
+		cerr << "receiving data:" << endl;
 		packetReceived.dump();
 
 		// FIN received
@@ -193,11 +219,11 @@ int main(int argc, char **argv)
 			shouldDropPkt = seqReceived > windowMaxSeq && seqReceived < nextInOrderSeq;
 		}
 		if (shouldDropPkt) {
-			cout << "Received pkt not w/in window!\n";
+			cerr << "Received pkt not w/in window!\n";
 		}
 		if (!shouldDropPkt) {
 			if (seqReceived == nextInOrderSeq) { 
-				cout << "Received in order packet!\n";
+				cerr << "Received in order packet!\n";
 				// save data to file
 				const char *data = packetReceived.data.c_str();
 				outFile.write(data, dataSize);
@@ -209,11 +235,12 @@ int main(int argc, char **argv)
 					uint16_t nextSeq = outOfOrderPkts[0].seqNum;
 					// first packet in deque is the next one! pop it off and keep going
 					if (nextSeq == nextInOrderSeq) {
-						cout << "Popping OoO packet w/ seq num " << nextSeq << '\n';
+						cerr << "Popping OoO packet w/ seq num " << nextSeq << '\n';
+						// get the OoO packet's data and data size, write to disk
 						data = outOfOrderPkts[0].data.c_str();
+						nextDataSize = outOfOrderPkts[0].data.size();
 						outFile.write(data, nextDataSize);
 						// update next expected sequence number
-						nextDataSize = outOfOrderPkts[0].data.size();
 						nextInOrderSeq = incSeqNum(nextInOrderSeq, nextDataSize);
 						outOfOrderPkts.pop_front();
 					}
@@ -224,11 +251,11 @@ int main(int argc, char **argv)
 			}
 			else {
 				// out of order, store it for later
-				cout << "Received out of order packet!\n";
+				cerr << "Received out of order packet!\n";
 				unsigned currVecSize = outOfOrderPkts.size();
 				// no OoO packets yet
 				if (!currVecSize) {
-					cout << "OoO list was empty, this is only OoO packet\n";
+					cerr << "OoO list was empty, this is only OoO packet\n";
 					outOfOrderPkts.push_back(packetReceived);
 				}
 				// received packet belongs after all other OoO packets
@@ -236,13 +263,13 @@ int main(int argc, char **argv)
 				// do this first in case the seq #'s wrapped around
 				else if (seqReceived >= incSeqNum(outOfOrderPkts.back().seqNum, outOfOrderPkts.back().data.size())) {
 					outOfOrderPkts.push_back(packetReceived);
-					cout << "OoO packet pushed to end of list\n";
+					cerr << "OoO packet pushed to end of list\n";
 				}
 				// received packet belongs before all other OoO packets
 				// if its seqNum < first packet's seqNum
 				else if (seqReceived < outOfOrderPkts[0].seqNum) {
 					outOfOrderPkts.push_front(packetReceived);
-					cout << "OoO packet inserted at front of list\n";
+					cerr << "OoO packet inserted at front of list\n";
 				}
 				// else, received packet belongs in b/w two of the OoO packets
 				else {
@@ -250,7 +277,7 @@ int main(int argc, char **argv)
 						uint16_t currSeq = outOfOrderPkts[i].seqNum;
 						if (seqReceived == currSeq) {
 							// already got this data packet, ignore it
-							cout << "OoO packet discarded: seqNum " << currSeq << '\n';
+							cerr << "OoO packet discarded: seqNum " << currSeq << '\n';
 							shouldDropPkt = true;
 							break;
 						}
@@ -262,7 +289,7 @@ int main(int argc, char **argv)
 							// TODO: fix this for case where seq #'s wrap around
 							if (seqReceived >= incSeqNum(outOfOrderPkts[i - 1].seqNum, outOfOrderPkts[i - 1].data.size()) && seqReceived < currSeq) {
 								outOfOrderPkts.insert(outOfOrderPkts.begin() + i, packetReceived);
-								cout << "OoO packet inserted in middle at pos " << i << '\n';
+								cerr << "OoO packet inserted in middle at pos " << i << '\n';
 								break;
 							}
 						}
@@ -272,7 +299,8 @@ int main(int argc, char **argv)
 		}
 		ackToSend = nextInOrderSeq; 
 		dataAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-		cout << "sending ACK:" << endl;
+		printSend("ACK", ackToSend, shouldDropPkt);
+		cerr << "sending ACK:" << endl;
 		dataAck.dump();
 		dataAck.sendto(sockfd, &si_server, serverLen);
 	}
@@ -294,16 +322,20 @@ int main(int argc, char **argv)
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
-	cout << "Sending FIN-ACK to server\n";
+	printSend("FIN-ACK", ackToSend, false);
+	cerr << "Sending FIN-ACK to server\n";
 	packetToSend.dump();
 
+	bool hasSentFin = false;
 	bool hasReceivedAck = false; /* receive packets until a FIN-ACK is received from server */
 	while (!hasReceivedAck) {
 
 		/* Send FIN; seq # stays same b/c no payload */
 		packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
 		packetToSend.sendto(sockfd, &si_server, serverLen);
-		cout << "Sending FIN to server\n";
+		printSend("FIN", ackToSend, hasSentFin);
+		hasSentFin = true; // so "retransmission" prints the second time
+		cerr << "Sending FIN to server\n";
 		packetToSend.dump();
 
 		int r = packetReceived.recvfrom(sockfd, &si_server, serverLen);
@@ -314,17 +346,17 @@ int main(int argc, char **argv)
 			// server resends FIN
 			case FIN_FLAG:
 				/* Send FIN-ACK */
-				cout << "Received FIN\n";
+				cerr << "Received FIN\n";
 				ackToSend = incSeqNum(packetReceived.seqNum, 1);
 				packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 				packetToSend.sendto(sockfd, &si_server, serverLen);
-				cout << "Sending FIN-ACK to server\n";
+				cerr << "Sending FIN-ACK to server\n";
 				packetToSend.dump();
 				break;
 
 			// get FIN-ACK; can exit now
 			case ACK_FLAG:
-				cout << "Received ACK of FIN! Closing connection.\n";
+				cerr << "Received ACK of FIN! Closing connection.\n";
 				hasReceivedAck = true;
 				break;
 
@@ -340,13 +372,13 @@ int main(int argc, char **argv)
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
-	cout << "Sending FIN-ACK to server\n";
+	cerr << "Sending FIN-ACK to server\n";
 	packetToSend.dump();
 	
 	// Send FIN; seq # stays same b/c no payload //
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "F");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
-	cout << "Sending FIN to server\n";
+	cerr << "Sending FIN to server\n";
 	packetToSend.dump();
 
     // Receive ACK of FIN without the FIN flag from server
@@ -354,7 +386,7 @@ int main(int argc, char **argv)
 	switch (packetReceived.flags) {
 		case ACK_FLAG:
 			//TODO: success
-			cout << "Received ACK of FIN from server\n";
+			cerr << "Received ACK of FIN from server\n";
 			break;
 		default:
 			cerr << "ACK of FIN wasn't received from server!\n";
