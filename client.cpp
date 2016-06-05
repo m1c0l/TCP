@@ -202,8 +202,10 @@ int main(int argc, char **argv)
 		packetReceived.dump();
 
 		// FIN received
-		if (packetReceived.getFlag('F'))
+		if (packetReceived.getFlag('F')) {
+			cerr << "OoO deque size at FIN: " << outOfOrderPkts.size() << '\n';
 			break;
+		}
 
 		streamsize dataSize = packetReceived.data.size();
 		uint16_t seqReceived = packetReceived.seqNum;
