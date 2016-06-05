@@ -212,6 +212,7 @@ int main(int argc, char **argv) {
 	//int congWindowSize = 1;
 	int cwndBot = 0;//seqToSend;
 	int cwndTop = 1;//seqToSend + DATA_SIZE;
+	int cwndToSend = cwndBot;
 	int congAvoidanceFlag=0;
 	int congAvoidValue=cwndBot;
 	int ssThresh = INT_MAX;
@@ -219,6 +220,7 @@ int main(int argc, char **argv) {
 	//bool randomBool = true;
 	int bytesToGet = 0;
 	int windowStartSeq = seqToSend;
+	int dynWindowStartSeq = windowStartSeq;//This one changes
 	uint16_t lastAckExpected;
 	uint16_t unwantedAck = seqToSend;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
 	while(true){
@@ -226,7 +228,8 @@ int main(int argc, char **argv) {
 	    if(filepkts == packsToSend){
 		break; 
 		}
-	    for(filepkts =  cwndBot; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
+	    dynWindowStartSeq = incSeqNum(windowStartSeq, DATA_SIZE * cwndBot);
+	    for(filepkts =  cwndToSend; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
 
 		memset(filebuf, 0, DATA_SIZE);
 		
@@ -246,19 +249,18 @@ int main(int argc, char **argv) {
 
 		// Increase sequence number to send next time by number of bytes sent
 		seqToSend = incSeqNum(seqToSend, bytesToGet);
-
 	    }
 	    
 	    //The first number that we expect from the client
-	    lastAckExpected = incSeqNum(windowStartSeq, DATA_SIZE);
+	    lastAckExpected = incSeqNum(dynWindowStartSeq, DATA_SIZE);
 
 	    // receive ACKs and retransmit until all packets ACKed
 	    getAcks(lastAckExpected, sockfd, &other, other_length, unwantedAck);
-	    // We successfulyy received an ack, so we increase the window size by 1 and move it
+	    // We successfully received an ack, so we increase the window size by 1 and move it
 	    if (lastAckRecvd == lastAckExpected && congAvoidanceFlag){
-		cwndBot++; cwndTop++;
-		if (cwndBot == congAvoidValue)
-		    cwndTop++; congAvoidValue = cwndTop +1;
+		cwndToSend = cwndTop; cwndBot++; cwndTop++;
+		if (cwndBot == congAvoidValue){
+		    cwndTop++; congAvoidValue = cwndTop +1;}
 		
 	    /*
 	    else if (lastAckRecvd == lastAckExpected) {
@@ -273,9 +275,11 @@ int main(int argc, char **argv) {
 		    continue;   
 		}
 		*/
-	    } else if (lastAckRecvd >= lastAckExpected || (lastAckRecvd < lastAckExpected && lastAckRecvd < windowStartSeq)){
+	    } else if (lastAckRecvd >= lastAckExpected || (lastAckRecvd < lastAckExpected && lastAckRecvd < dynWindowStartSeq)){//TODO: use receive window to check if packet is in window
+		cwndToSend = cwndTop;
 		cwndBot+=(1 + (lastAckRecvd-lastAckExpected)/DATA_SIZE);
 		cwndTop+=(1 + 2*(lastAckRecvd-lastAckExpected)/DATA_SIZE);
+		 
 		unwantedAck = lastAckRecvd;
 		if(cwndTop - cwndBot >= ssThresh){
 		    congAvoidanceFlag=1;
@@ -296,7 +300,6 @@ int main(int argc, char **argv) {
 		ssThresh = (cwndTop-cwndBot)/2;
 		cwndTop = cwndBot+1;
 		congAvoidanceFlag = 0;
-		continue;
 	    }
 	}
 	
