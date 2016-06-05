@@ -14,7 +14,7 @@
 #include <chrono>
 #include <future>
 #include <unordered_map>
-#include <limits.h>
+
 #include "Utils.h"
 #include "TcpMessage.h"
 
@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
 	int cwndToSend = cwndBot;
 	int congAvoidanceFlag=0;
 	int congAvoidValue=cwndBot;
-	int ssThresh = INT_MAX;
+	int ssThresh = INIT_RECV_WINDOW;
 	int filepkts = 0;
 	//bool randomBool = true;
 	int bytesToGet = 0;
@@ -225,9 +225,8 @@ int main(int argc, char **argv) {
 	uint16_t unwantedAck = seqToSend;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
 	while(true){
 	   
-	    if(filepkts == packsToSend){
-		break; 
-		}
+	    if(lastAckRecvd == incSeqNum(windowStartSeq, bodyLength))
+		break;
 	    dynWindowStartSeq = incSeqNum(windowStartSeq, DATA_SIZE * cwndBot);
 	    for(filepkts =  cwndToSend; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
 
@@ -278,7 +277,7 @@ int main(int argc, char **argv) {
 	    } else if (lastAckRecvd >= lastAckExpected || (lastAckRecvd < lastAckExpected && lastAckRecvd < dynWindowStartSeq)){//TODO: use receive window to check if packet is in window
 		cwndToSend = cwndTop;
 		cwndBot+=(1 + (lastAckRecvd-lastAckExpected)/DATA_SIZE);
-		cwndTop+=(1 + 2*(lastAckRecvd-lastAckExpected)/DATA_SIZE);
+		cwndTop+=(2 + 2*(lastAckRecvd-lastAckExpected)/DATA_SIZE);
 		 
 		unwantedAck = lastAckRecvd;
 		if(cwndTop - cwndBot >= ssThresh){
@@ -298,6 +297,7 @@ int main(int argc, char **argv) {
 		//packetsInWindow[lastAckRecvd].dump();
 		//packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
 		ssThresh = (cwndTop-cwndBot)/2;
+		cwndToSend = cwndBot;
 		cwndTop = cwndBot+1;
 		congAvoidanceFlag = 0;
 	    }
