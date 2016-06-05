@@ -35,20 +35,22 @@ void printSend(string pktType, uint16_t seq, int cwndPkts, int ssThresh, bool is
 bool keepGettingAcks = true;
 uint16_t lastAckRecvd;
 uint16_t clientRecvWindow; // Set this each time client sends packet
+bool getAckTimedOut = false;
 
 void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len, uint16_t unwantedAck) {
 	TcpMessage ack;
 	while (keepGettingAcks && lastAckRecvd != finalAck) {
 		if (ack.recvfrom(sockfd, si_other, len) == RECV_SUCCESS) {
-			printRecv("ACK", ack.ackNum);
-			ack.dump();
-			lastAckRecvd = ack.ackNum;
-			clientRecvWindow = ack.recvWindow;
-			if(lastAckRecvd != unwantedAck)
-			    break;
+		    getAckTimedOut = false;
+		    printRecv("ACK", ack.ackNum);
+		    ack.dump();
+		    lastAckRecvd = ack.ackNum;
+		    clientRecvWindow = ack.recvWindow;
+		    if(lastAckRecvd != unwantedAck)
+			break;
 		}
 		else {
-			cerr << "no ACK received" << endl;
+		    cerr << "no ACK received" << endl;
 		}
 	}	
 }
@@ -57,6 +59,7 @@ void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen
 void getAcks(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len, uint16_t unwantedAck) {
 	chrono::milliseconds timer(TIMEOUT);
 	keepGettingAcks = true;
+	getAckTimedOut = true;;
 	future<void> promise = async(launch::async, getAcksHelper, finalAck, sockfd, si_other, len, unwantedAck);
 	promise.wait_for(timer); // run for 0.5s
 	keepGettingAcks = false;
@@ -295,6 +298,17 @@ int main(int argc, char **argv) {
 		    congAvoidanceFlag=1;
 		    congAvoidValue = cwndTop+1;
 		}
+		continue;
+
+	    }
+	    if (getAckTimedOut){
+		//No ACKS received so we have to retransmitt
+		cout << "Retransmitting: " << lastAckRecvd << endl;
+		ssThresh = (cwndTop-cwndBot)/2;
+		cwndToSend = cwndBot;
+		cwndTop = cwndBot+1;
+		congAvoidanceFlag = 0;
+		seqToSend = (seqToSend + MAX_SEQ_NUM -  bytesToGet) % MAX_SEQ_NUM;
 		continue;
 
 	    }
