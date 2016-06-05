@@ -20,6 +20,11 @@
 
 using namespace std;
 
+void printRecv(string pktType, uint16_t ack) {
+	cout << "Receiving " << pktType << " packet " << ack << '\n';
+}
+
+// TODO: printSend needs congestion window size and ssthresh
 
 bool keepGettingAcks = true;
 uint16_t lastAckRecvd;
@@ -28,12 +33,12 @@ void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen
 	TcpMessage ack;
 	while (keepGettingAcks && lastAckRecvd != finalAck) {
 		if (ack.recvfrom(sockfd, si_other, len) == RECV_SUCCESS) {
-			cout << "received ACK:" << endl;
+			printRecv("ACK", ack.ackNum);
 			ack.dump();
 			lastAckRecvd = ack.ackNum;
 		}
 		else {
-			cout << "no ACK received" << endl;
+			cerr << "no ACK received" << endl;
 		}
 	}
 }
@@ -100,19 +105,19 @@ int main(int argc, char **argv) {
 	int pktSent = 0;
 	string flagsToSend = "";
 	for (int packetsSent = 0; true; packetsSent++) {
-	    cout << "Waiting for something" << endl;
+	    cerr << "Waiting for something" << endl;
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
 			if (hasReceivedSyn) { // client ACK not received; resend SYN-ACK
 				toSend.sendto(sockfd, &other, other_length);
-				cout << "Sending SYN-ACK (retransmit):" << endl;
+				cerr << "Sending SYN-ACK (retransmit):" << endl;
 				toSend.dump();
 			}
 			continue;
 		}
 
-		cout << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
-		cout << "Received:" << endl;
+		cerr << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
+		cerr << "Received:" << endl;
 		received.dump();
 
 		if (!packetsSent) {
@@ -129,6 +134,7 @@ int main(int argc, char **argv) {
 	      
 		switch (received.flags) {
 		case SYN_FLAG:
+			printRecv("SYN", received.ackNum);
 		    if (hasReceivedSyn) {
 				cerr << "Multiple SYNs\n"; 
 				break;
@@ -144,6 +150,7 @@ int main(int argc, char **argv) {
 		    break;
 
 		case ACK_FLAG:
+			printRecv("ACK", received.ackNum);
 		    if (!hasReceivedSyn) {
 				cerr << "ACK before handshake\n"; 
 				break;
@@ -168,7 +175,7 @@ int main(int argc, char **argv) {
 		clientRecvWindow = received.recvWindow;
 		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 		toSend.sendto(sockfd, &other, other_length);
-		cout << "Handshake: sending packet\n";
+		cerr << "Handshake: sending packet\n";
 		toSend.dump();
 	}
 
@@ -210,7 +217,7 @@ int main(int argc, char **argv) {
 		// store packet in case retransmission needed
 		packetsInWindow[toSend.seqNum] = toSend;
 
-		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
+		cerr << "sending packet " << filepkts << " of file: "<< filename << endl;
 		toSend.dump();
 		toSend.sendto(sockfd, &other, other_length);
 
@@ -233,18 +240,18 @@ int main(int argc, char **argv) {
 				 << " not in packetsInWindow" << '\n';
 		}
 		else {
-			cout << "Retransmitting: " << lastAckRecvd << endl;
+			cerr << "Retransmitting: " << lastAckRecvd << endl;
 			//packetsInWindow[lastAckRecvd].dump();
 			packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
 		}
 	}
-	cout << "out of loop\n";
+	cerr << "out of loop\n";
 
 	/*
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++) {
 		received.recvfrom(sockfd, &other, other_length);
 		// receive ack for data
-		cout << "Received ack for data:\n";
+		cerr << "Received ack for data:\n";
 		received.dump();
 		switch (received.flags) {
 			case ACK_FLAG:
@@ -268,7 +275,7 @@ int main(int argc, char **argv) {
 			ackToSend = 0; // ACK is invalid this packet
 			toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 			toSend.sendto(sockfd, &other, other_length);
-			cout << "Sending FIN\n";
+			cerr << "Sending FIN\n";
 			toSend.dump();
 		}
 
@@ -279,31 +286,33 @@ int main(int argc, char **argv) {
 
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
-			cout << "Timeout while waiting for FIN-ACK/FIN\n";
+			cerr << "Timeout while waiting for FIN-ACK/FIN\n";
 			continue;
 		}
 		switch(received.flags) {
 			// FIN-ACK
 			case FIN_FLAG | ACK_FLAG:
 				// TODO: success
-				cout << "Received FIN-ACK\n";
+				printRecv("FIN-ACK", received.ackNum);
+				cerr << "Received FIN-ACK\n";
 				hasReceivedFinAck = true;
 				break;
 
 			// FIN
 			case FIN_FLAG:
-				cout << "Received FIN\n";
 				hasReceivedFinAck = true; // assume that client got a FIN
 				hasReceivedFin = true;
+				printRecv("FIN", received.ackNum);
+				cerr << "Received FIN\n";
 
 				flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
 				seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
 				ackToSend = incSeqNum(received.seqNum, 1); // increase ack by 1
 				toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 				toSend.sendto(sockfd, &other, other_length);
-				cout << "Sending ACK of FIN\n";
+				cerr << "Sending ACK of FIN\n";
 				toSend.dump();
-				cout << "Server received FIN; starting timed wait..." << endl;
+				cerr << "Server received FIN; starting timed wait..." << endl;
 				break;
 
 			default:
@@ -319,13 +328,13 @@ int main(int argc, char **argv) {
 	/*
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
-			cout << "Timeout while waiting for FIN\n";
+			cerr << "Timeout while waiting for FIN\n";
 			continue;
 		}
 		switch(received.flags) {
 			case FIN_FLAG:
 				// TODO: success
-				cout << "Received FIN\n";
+				cerr << "Received FIN\n";
 				hasReceivedFin = true;
 				break;
 			default:
@@ -336,7 +345,7 @@ int main(int argc, char **argv) {
 	}
 	*/
 
-	cout << "Shouldn't receive anything else from client now\n";
+	cerr << "Shouldn't receive anything else from client now\n";
 	//received.recvfrom(sockfd, &other, other_length);
 	/* TODO: shouldn't receive anything from client so deal with cases where client sends stuff */
 	
