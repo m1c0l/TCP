@@ -269,6 +269,20 @@ int main(int argc, char **argv) {
 	    // receive ACKs and retransmit until all packets ACKed
 	    getAcks(lastAckExpected, sockfd, &other, other_length, unwantedAck);
 	    // We successfully received an ack, so we increase the window size by 1 and move it
+	    if (getAckTimedOut){
+		//No ACKS received so we have to retransmitt
+		cout << "Retransmitting: " << lastAckRecvd << endl;
+		ssThresh = (cwndTop-cwndBot)/2;
+		cwndToSend = cwndBot;
+		cwndTop = cwndBot+1;
+		congAvoidanceFlag = 0;
+		//seqToSend = (seqToSend + MAX_SEQ_NUM -  bytesToGet) % MAX_SEQ_NUM;
+		seqToSend = lastAckRecvd;
+		wantedFile.seekg(cwndBot * DATA_SIZE, ios::beg);
+		unwantedAck = lastAckRecvd;
+		continue;
+
+	    }
 	    if (lastAckRecvd == lastAckExpected && congAvoidanceFlag){
 		cwndToSend = cwndTop; cwndBot++; cwndTop++;
 		if (cwndBot == congAvoidValue){
@@ -301,17 +315,6 @@ int main(int argc, char **argv) {
 		continue;
 
 	    }
-	    if (getAckTimedOut){
-		//No ACKS received so we have to retransmitt
-		cout << "Retransmitting: " << lastAckRecvd << endl;
-		ssThresh = (cwndTop-cwndBot)/2;
-		cwndToSend = cwndBot;
-		cwndTop = cwndBot+1;
-		congAvoidanceFlag = 0;
-		seqToSend = (seqToSend + MAX_SEQ_NUM -  bytesToGet) % MAX_SEQ_NUM;
-		continue;
-
-	    }
 	    // all packets ACKed
 	    if(lastAckRecvd == incSeqNum(windowStartSeq, bodyLength)) {
 		break;
@@ -330,6 +333,8 @@ int main(int argc, char **argv) {
 		cwndTop = cwndBot+1;
 		congAvoidanceFlag = 0;
 		seqToSend = lastAckRecvd;
+		wantedFile.seekg(cwndBot * DATA_SIZE, ios::beg);
+		unwantedAck = lastAckRecvd;
 	    }
 	}
 	
