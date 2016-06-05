@@ -14,7 +14,7 @@
 #include <chrono>
 #include <future>
 #include <unordered_map>
-
+#include <limits.h>
 #include "Utils.h"
 #include "TcpMessage.h"
 
@@ -210,20 +210,21 @@ int main(int argc, char **argv) {
 	
 	unordered_map<uint16_t, TcpMessage> packetsInWindow; // seqNum => TcpMessage
 	//int congWindowSize = 1;
-	int cwndBot = 0;
-	int cwndTop = 1;
+	int cwndBot = 0;//seqToSend;
+	int cwndTop = 1;//seqToSend + DATA_SIZE;
 	int congAvoidanceFlag=0;
 	int congAvoidValue=cwndBot;
-	int ssThresh = 200000000;
-	int filepkts;
+	int ssThresh = INT_MAX;
+	int filepkts = 0;
 	bool randomBool = true;
 	int bytesToGet = 0;
-	uint16_t unwantedAck = seqToSend-1;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
+	int windowStartSeq = seqToSend;
+	uint16_t lastAckExpected;
+	uint16_t unwantedAck = seqToSend;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
 	while(randomBool){
-	    int windowStartSeq = seqToSend;
-	    for(filepkts = cwndBot; filepkts < cwndTop && cwndTop < packsToSend; filepkts++, pktSent++){
-		if (filepkts >= packsToSend)
-		    {randomBool = false; break;}
+	   
+	    for(filepkts =  cwndBot; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
+
 		memset(filebuf, 0, DATA_SIZE);
 
 		//Read DATA_SIZE bytes normally, otherwise read the exact amount needed for the last packet
@@ -243,8 +244,9 @@ int main(int argc, char **argv) {
 		seqToSend = incSeqNum(seqToSend, bytesToGet);
 
 	    }
-	  
-	    uint16_t lastAckExpected = incSeqNum(windowStartSeq, DATA_SIZE);
+	    
+	    //The first number that we expect from the client
+	    lastAckExpected = incSeqNum(windowStartSeq, DATA_SIZE);
 
 	    // receive ACKs and retransmit until all packets ACKed
 	    getAcks(lastAckExpected, sockfd, &other, other_length, unwantedAck);
@@ -267,8 +269,7 @@ int main(int argc, char **argv) {
 		    continue;   
 		}
 		*/
-	} else if (lastAckRecvd >= lastAckExpected){
-		//Evvviill
+	    } else if (lastAckRecvd >= lastAckExpected || (lastAckRecvd < lastAckExpected && lastAckRecvd < windowStartSeq)){
 		cwndBot+=(1 + (lastAckRecvd-lastAckExpected)/DATA_SIZE);
 		cwndTop+=(1 + 2*(lastAckRecvd-lastAckExpected)/DATA_SIZE);
 		unwantedAck = lastAckRecvd;
@@ -291,14 +292,10 @@ int main(int argc, char **argv) {
 		ssThresh = (cwndTop-cwndBot)/2;
 		cwndTop = cwndBot+1;
 		congAvoidanceFlag = 0;
-		
 		continue;
 	    }
 	}
 	
-
-
-
 
 /*
 	for (int totalFilePkts = 0; totalFilePkts < packsToSend; totalFilePkts += congWindowSize){ 
@@ -350,14 +347,6 @@ int main(int argc, char **argv) {
 
 
 */
-
-
-
-
-
-
-
-
 
 	cout << "out of loop\n";
 
