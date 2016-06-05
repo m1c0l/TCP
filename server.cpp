@@ -293,6 +293,7 @@ int main(int argc, char **argv) {
 			// FIN
 			case FIN_FLAG:
 				cout << "Received FIN\n";
+				hasReceivedFinAck = true; // assume that client got a FIN
 				hasReceivedFin = true;
 
 				flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
