@@ -28,6 +28,7 @@ void printRecv(string pktType, uint16_t ack) {
 
 bool keepGettingAcks = true;
 uint16_t lastAckRecvd;
+uint16_t clientRecvWindow; // Set this each time client sends packet
 
 void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len, uint16_t unwantedAck) {
 	TcpMessage ack;
@@ -36,6 +37,7 @@ void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen
 			printRecv("ACK", ack.ackNum);
 			ack.dump();
 			lastAckRecvd = ack.ackNum;
+			clientRecvWindow = ack.recvWindow;
 			if(lastAckRecvd != unwantedAck)
 			    break;
 		}
@@ -46,7 +48,7 @@ void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen
 }
 
 // Receive ACKs for 0.5 seconds and returns the latest ACK received
-	void getAcks(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len, uint16_t unwantedAck) {
+void getAcks(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len, uint16_t unwantedAck) {
 	chrono::milliseconds timer(TIMEOUT);
 	keepGettingAcks = true;
 	future<void> promise = async(launch::async, getAcksHelper, finalAck, sockfd, si_other, len, unwantedAck);
@@ -103,7 +105,6 @@ int main(int argc, char **argv) {
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
 	lastAckRecvd = seqToSend;
-	uint16_t clientRecvWindow; // Set this each time client sends packet
 	ifstream wantedFile;
 	int packsToSend;
 	int pktSent = 0;
@@ -123,6 +124,8 @@ int main(int argc, char **argv) {
 		cerr << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cerr << "Received:" << endl;
 		received.dump();
+
+		clientRecvWindow = received.recvWindow;
 
 		if (!packetsSent) {
 			// Set receive timeout of 0.5s
@@ -176,7 +179,6 @@ int main(int argc, char **argv) {
 		}	      
 
 		ackToSend = incSeqNum(received.seqNum, 1);
-		clientRecvWindow = received.recvWindow;
 		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 		toSend.sendto(sockfd, &other, other_length);
 		cerr << "Handshake: sending packet\n";
@@ -402,6 +404,8 @@ int main(int argc, char **argv) {
 			cerr << "Timeout while waiting for FIN-ACK/FIN\n";
 			continue;
 		}
+		clientRecvWindow = received.recvWindow;
+
 		switch(received.flags) {
 			// FIN-ACK
 			case FIN_FLAG | ACK_FLAG:
