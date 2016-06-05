@@ -30,11 +30,11 @@ void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen
 		if (ack.recvfrom(sockfd, si_other, len) == RECV_SUCCESS) {
 			cout << "received ACK:" << endl;
 			ack.dump();
+			lastAckRecvd = ack.ackNum;
 		}
 		else {
 			cout << "no ACK received" << endl;
 		}
-		lastAckRecvd = ack.ackNum;
 	}
 }
 
