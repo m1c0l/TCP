@@ -315,6 +315,7 @@ int main(int argc, char **argv) {
 		cwndToSend = cwndBot;
 		cwndTop = cwndBot+1;
 		congAvoidanceFlag = 0;
+		seqToSend = (seqToSend + MAX_SEQ_NUM -  bytesToGet) % MAX_SEQ_NUM;
 	    }
 	}
 	
