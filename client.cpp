@@ -83,14 +83,7 @@ int main(int argc, char **argv)
     }
 
 	// Set receive timeout of 0.5 s
-	timeval recvTimeout;
-	recvTimeout.tv_sec = 0;
-	recvTimeout.tv_usec = TIMEOUT * 1000;
-
-	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char*)&recvTimeout, sizeof(recvTimeout)) == -1) {
-		perror("setsockopt");
-		return 1;
-	}
+	setSocketTimeout(sockfd, 0, TIMEOUT * 1000);
  
     sockaddr_in si_server;
     memset((char *) &si_server, 0, sizeof(si_server));

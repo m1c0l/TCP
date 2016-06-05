@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include <cstdint>
+#include <time.h>
 
 const int BUFFER_SIZE = 1032;
 const int INIT_CONGEST_WINDOW = 1024;
@@ -21,5 +22,6 @@ const int TIMEOUT = 500; // milliseconds
 const int MAX_SEG_LIFETIME = 60 * 1000; // milliseconds
 
 uint16_t incSeqNum(uint16_t seq, uint16_t increment);
+void setSocketTimeout(int sockfd, int sec, int usec);
 
 #endif
