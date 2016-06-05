@@ -173,15 +173,17 @@ int main(int argc, char **argv)
 	deque<TcpMessage> outOfOrderPkts;
 	// first data packet's sequence number we should receive
 	uint16_t nextInOrderSeq = ackToSend;
+	bool handshakeAckResend = false;
 
 	while (true) {
 		/* send handshake ACK */
 		if (!handshakeComplete) {
-			packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-			printSend("ACK", seqToSend, false); // TODO: not false each time
+			packetToSend = TcpMessage(handshakeSeq, handshakeAck, recvWindowToSend, "A");
+			printSend("ACK", seqToSend, handshakeAckResend);
 			cerr << "sending ACK:" << endl;
 			packetToSend.dump();
 			packetToSend.sendto(sockfd, &si_server, serverLen);
+			handshakeAckResend = true;
 		}
 
 		/* receive data packet */
@@ -197,15 +199,16 @@ int main(int argc, char **argv)
 		handshakeComplete = true; // done with handshake if this is a data pkt
 
 		// else, r == RECV_SUCCESS
-		printRecv("data", packetReceived.seqNum);
 		cerr << "receiving data:" << endl;
 		packetReceived.dump();
 
 		// FIN received
 		if (packetReceived.getFlag('F')) {
 			cerr << "OoO deque size at FIN: " << outOfOrderPkts.size() << '\n';
+			printRecv("FIN", packetReceived.seqNum);
 			break;
 		}
+		printRecv("data", packetReceived.seqNum);
 
 		streamsize dataSize = packetReceived.data.size();
 		uint16_t seqReceived = packetReceived.seqNum;

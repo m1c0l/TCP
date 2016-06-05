@@ -24,33 +24,48 @@ void printRecv(string pktType, uint16_t ack) {
 	cout << "Receiving " << pktType << " packet " << ack << '\n';
 }
 
-// TODO: printSend needs congestion window size and ssthresh
+void printSend(string pktType, uint16_t seq, int cwndPkts, int ssThresh, bool isRetransmit) {
+	cout << "Sending " << pktType << " packet " << seq << " " << cwndPkts * DATA_SIZE << " " << ssThresh;
+	if (isRetransmit) {
+		cout << " Retransmission";
+	}
+	cout << '\n';
+}
 
 bool keepGettingAcks = true;
 uint16_t lastAckRecvd;
+uint16_t clientRecvWindow; // Set this each time client sends packet
+bool getAckTimedOut = false;
 
-void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+void getAcksHelper(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len, uint16_t unwantedAck) {
 	TcpMessage ack;
 	while (keepGettingAcks && lastAckRecvd != finalAck) {
 		if (ack.recvfrom(sockfd, si_other, len) == RECV_SUCCESS) {
-			printRecv("ACK", ack.ackNum);
-			ack.dump();
-			lastAckRecvd = ack.ackNum;
+		    getAckTimedOut = false;
+		    printRecv("ACK", ack.ackNum);
+		    ack.dump();
+		    lastAckRecvd = ack.ackNum;
+		    clientRecvWindow = ack.recvWindow;
+		    if(lastAckRecvd != unwantedAck)
+			break;
 		}
 		else {
-			cerr << "no ACK received" << endl;
+		    cerr << "no ACK received" << endl;
 		}
-	}
+	}	
 }
 
 // Receive ACKs for 0.5 seconds and returns the latest ACK received
-void getAcks(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len) {
+void getAcks(uint16_t finalAck, int sockfd, sockaddr_in *si_other, socklen_t len, uint16_t unwantedAck) {
 	chrono::milliseconds timer(TIMEOUT);
 	keepGettingAcks = true;
-	future<void> promise = async(launch::async, getAcksHelper, finalAck, sockfd, si_other, len);
+	getAckTimedOut = true;;
+	future<void> promise = async(launch::async, getAcksHelper, finalAck, sockfd, si_other, len, unwantedAck);
 	promise.wait_for(timer); // run for 0.5s
 	keepGettingAcks = false;
 }
+
+
 
 int main(int argc, char **argv) {
 	if (argc != 3) {
@@ -99,7 +114,6 @@ int main(int argc, char **argv) {
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
 	lastAckRecvd = seqToSend;
-	uint16_t clientRecvWindow; // Set this each time client sends packet
 	ifstream wantedFile;
 	int packsToSend;
 	int pktSent = 0;
@@ -109,6 +123,7 @@ int main(int argc, char **argv) {
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
 			if (hasReceivedSyn) { // client ACK not received; resend SYN-ACK
+				printSend("SYN-ACK", toSend.seqNum, 1, INIT_RECV_WINDOW, true);
 				toSend.sendto(sockfd, &other, other_length);
 				cerr << "Sending SYN-ACK (retransmit):" << endl;
 				toSend.dump();
@@ -119,6 +134,8 @@ int main(int argc, char **argv) {
 		cerr << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
 		cerr << "Received:" << endl;
 		received.dump();
+
+		clientRecvWindow = received.recvWindow;
 
 		if (!packetsSent) {
 			// Set receive timeout of 0.5s
@@ -136,22 +153,24 @@ int main(int argc, char **argv) {
 		case SYN_FLAG:
 			printRecv("SYN", received.ackNum);
 		    if (hasReceivedSyn) {
-				cerr << "Multiple SYNs\n"; 
-				break;
+				cerr << "Got another SYN, sending SYN-ACK\n"; 
 			}
-		    hasReceivedSyn = true;
 		    flagsToSend ="SA";
+			printSend("SYN-ACK", seqToSend, 1, INIT_RECV_WINDOW, hasReceivedSyn); 
+		    hasReceivedSyn = true;
 		   
 		    break;
 		
 		case SYN_FLAG | ACK_FLAG:
 		    cerr << "Both SYN and ACK were set by client\n";
+			// TODO: should we deal with this case?
 		    //exit(1);
 		    break;
 
 		case ACK_FLAG:
 			printRecv("ACK", received.ackNum);
 		    if (!hasReceivedSyn) {
+				// TODO: think about this case more
 				cerr << "ACK before handshake\n"; 
 				break;
 			}
@@ -172,7 +191,6 @@ int main(int argc, char **argv) {
 		}	      
 
 		ackToSend = incSeqNum(received.seqNum, 1);
-		clientRecvWindow = received.recvWindow;
 		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 		toSend.sendto(sockfd, &other, other_length);
 		cerr << "Handshake: sending packet\n";
@@ -201,10 +219,125 @@ int main(int argc, char **argv) {
 	ackToSend = incSeqNum(received.seqNum, recvLength);
 	// increment our sequence number by 1
 	seqToSend = incSeqNum(seqToSend, 1); 
-
+	
 	unordered_map<uint16_t, TcpMessage> packetsInWindow; // seqNum => TcpMessage
+	//int congWindowSize = 1;
+	int cwndBot = 0;//seqToSend;
+	int cwndTop = 1;//seqToSend + DATA_SIZE;
+	int cwndToSend = cwndBot;
+	int congAvoidanceFlag=0;
+	int congAvoidValue=cwndBot;
+	int ssThresh = INIT_RECV_WINDOW;
+	int filepkts = 0;
+	//bool randomBool = true;
+	int bytesToGet = 0;
+	int windowStartSeq = seqToSend;
+	int dynWindowStartSeq = windowStartSeq;//This one changes
+	uint16_t lastAckExpected;
+	uint16_t unwantedAck = seqToSend;//This is the ACK that would be send if the client gets packets out of order and does its cumulative ack, we check for this to see when we finally receive a correct ACK
+	while(true){
+	   
+	    dynWindowStartSeq = incSeqNum(windowStartSeq, DATA_SIZE * cwndBot);
+	    for(filepkts =  cwndToSend; filepkts < cwndTop && filepkts < packsToSend; filepkts++, pktSent++){
 
-	for (int filepkts = 0; filepkts < packsToSend; filepkts++, pktSent++) {
+		memset(filebuf, 0, DATA_SIZE);
+		
+
+		//Read DATA_SIZE bytes normally, otherwise read the exact amount needed for the last packet
+		bytesToGet = ((filepkts == (packsToSend-1)) && (bodyLength % DATA_SIZE != 0))  ? (bodyLength % DATA_SIZE) : DATA_SIZE;
+		wantedFile.read(filebuf, bytesToGet);
+		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, "A");
+		toSend.data = string(filebuf, bytesToGet);
+	    
+		// if already in map, we're retransmitting
+		bool isRetransmit = packetsInWindow.count(toSend.seqNum);
+		// store packet in case retransmission needed
+		packetsInWindow[toSend.seqNum] = toSend;
+
+		printSend("data", toSend.seqNum, cwndTop - cwndBot, ssThresh, isRetransmit);
+		cout << "sending packet " << filepkts << " of file: "<< filename << endl;
+		toSend.dump();
+		toSend.sendto(sockfd, &other, other_length);
+
+		// Increase sequence number to send next time by number of bytes sent
+		seqToSend = incSeqNum(seqToSend, bytesToGet);
+	    }
+	    
+	    //The first number that we expect from the client
+	    lastAckExpected = incSeqNum(dynWindowStartSeq, DATA_SIZE);
+
+	    // receive ACKs and retransmit until all packets ACKed
+	    getAcks(lastAckExpected, sockfd, &other, other_length, unwantedAck);
+	    // We successfully received an ack, so we increase the window size by 1 and move it
+	    if (lastAckRecvd == lastAckExpected && congAvoidanceFlag){
+		cwndToSend = cwndTop; cwndBot++; cwndTop++;
+		if (cwndBot == congAvoidValue){
+		    cwndTop++; congAvoidValue = cwndTop +1;}
+		
+	    /*
+	    else if (lastAckRecvd == lastAckExpected) {
+		if(cwndTop-cwndBot < ssThresh){
+		    cwndBot++;
+		    cwndTop+=2;
+		    unwantedAck = lastAckRecvd;
+		    if(cwndTop - cwndBot >= ssThresh){
+			congAvoidanceFlag=1;
+			congAvoidValue = cwndTop+1;
+		    }
+		    continue;   
+		}
+		*/
+	    } else if (lastAckRecvd >= lastAckExpected || (lastAckRecvd < lastAckExpected && lastAckRecvd < dynWindowStartSeq)){//TODO: use receive window to check if packet is in window
+		cerr << "=========================================" << endl;
+		cwndToSend = cwndTop;
+		cwndBot+=(1 + (lastAckRecvd-lastAckExpected)/DATA_SIZE);
+		cwndTop+=(2 + 2*(lastAckRecvd-lastAckExpected)/DATA_SIZE);
+		 
+		unwantedAck = lastAckRecvd;
+		if(cwndTop - cwndBot >= ssThresh){
+		    congAvoidanceFlag=1;
+		    congAvoidValue = cwndTop+1;
+		}
+		continue;
+
+	    }
+	    if (getAckTimedOut){
+		//No ACKS received so we have to retransmitt
+		cout << "Retransmitting: " << lastAckRecvd << endl;
+		ssThresh = (cwndTop-cwndBot)/2;
+		cwndToSend = cwndBot;
+		cwndTop = cwndBot+1;
+		congAvoidanceFlag = 0;
+		seqToSend = (seqToSend + MAX_SEQ_NUM -  bytesToGet) % MAX_SEQ_NUM;
+		continue;
+
+	    }
+	    // all packets ACKed
+	    if(lastAckRecvd == incSeqNum(windowStartSeq, bodyLength)) {
+		break;
+	    }
+	    // retransmit
+	    if (packetsInWindow.count(lastAckRecvd) == 0) {
+		cerr << "packet with sequence number " << lastAckRecvd
+			     << " not in packetsInWindow" << '\n';
+	    }
+	    else {//PacketLoss
+		cout << "Retransmitting: " << lastAckRecvd << endl;
+		//packetsInWindow[lastAckRecvd].dump();
+		//packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
+		ssThresh = (cwndTop-cwndBot)/2;
+		cwndToSend = cwndBot;
+		cwndTop = cwndBot+1;
+		congAvoidanceFlag = 0;
+		seqToSend = lastAckRecvd;
+	    }
+	}
+	
+
+/*
+	for (int totalFilePkts = 0; totalFilePkts < packsToSend; totalFilePkts += congWindowSize){ 
+
+	    for (filepkts = 0; filepkts < congWindowSize; filepkts++, pktSent++) {
 
 		memset(filebuf, 0, DATA_SIZE);
 
@@ -225,10 +358,10 @@ int main(int argc, char **argv) {
 		seqToSend = incSeqNum(seqToSend, bytesToGet);
 	}
 
-	uint16_t lastAckExpected = seqToSend;
+	    uint16_t lastAckExpected = seqToSend;
 
-	// receive ACKs and retransmit until all packets ACKed
-	while (true) {
+	    // receive ACKs and retransmit until all packets ACKed
+	    while (true) {
 		getAcks(lastAckExpected, sockfd, &other, other_length);
 		// all packets acked
 		if (lastAckRecvd == lastAckExpected) {
@@ -244,8 +377,15 @@ int main(int argc, char **argv) {
 			//packetsInWindow[lastAckRecvd].dump();
 			packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
 		}
+	    }
+
+
 	}
-	cerr << "out of loop\n";
+
+
+*/
+
+	cout << "out of loop\n";
 
 	/*
 	for (int filepkts = 0; filepkts < packsToSend; filepkts++) {
@@ -266,6 +406,7 @@ int main(int argc, char **argv) {
 	bool hasReceivedFin = false;
 	bool hasReceivedFinAck = false;
 	int timedWaitTimer = 2 * MAX_SEG_LIFETIME; // milliseconds to wait before closing
+
 	while (timedWaitTimer > 0) {
 
 		/* send FIN if no FIN-ACK received yet */
@@ -289,6 +430,8 @@ int main(int argc, char **argv) {
 			cerr << "Timeout while waiting for FIN-ACK/FIN\n";
 			continue;
 		}
+		clientRecvWindow = received.recvWindow;
+
 		switch(received.flags) {
 			// FIN-ACK
 			case FIN_FLAG | ACK_FLAG:
