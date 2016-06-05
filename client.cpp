@@ -173,15 +173,17 @@ int main(int argc, char **argv)
 	deque<TcpMessage> outOfOrderPkts;
 	// first data packet's sequence number we should receive
 	uint16_t nextInOrderSeq = ackToSend;
+	bool handshakeAckResend = false;
 
 	while (true) {
 		/* send handshake ACK */
 		if (!handshakeComplete) {
-			packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-			printSend("ACK", seqToSend, false); // TODO: not false each time
+			packetToSend = TcpMessage(handshakeSeq, handshakeAck, recvWindowToSend, "A");
+			printSend("ACK", seqToSend, handshakeAckResend);
 			cerr << "sending ACK:" << endl;
 			packetToSend.dump();
 			packetToSend.sendto(sockfd, &si_server, serverLen);
+			handshakeAckResend = true;
 		}
 
 		/* receive data packet */
