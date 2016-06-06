@@ -75,10 +75,12 @@ timeval timeRemaining(timeval start) {
 	timeval n = now();
 
 	timeval result;
-	timeval_subtract(&result, &end, &n);
-	// make result nonzero (0 => no timeout)
-	if (result.tv_sec == 0 && result.tv_usec == 0) {
-		result.tv_usec = 1;
+	int r = timeval_subtract(&result, &end, &n);
+
+	// make result zero if negative
+	if (r == 1) {
+		result.tv_sec = 0;
+		result.tv_usec = 0;
 	}
 	return result;
 }

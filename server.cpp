@@ -38,7 +38,11 @@ uint16_t clientRecvWindow; // Set this each time client sends packet
 uint16_t rwndBot;
 uint16_t rwndTop;
 bool getAckTimedOut = false;
+unordered_map<uint16_t, TcpMessage> packetsInWindow; // seqNum => TcpMessage
+unordered_map<uint16_t, timeval> timestamps; // seqNum => timestamp
+uint16_t timedOutSeq;
 
+/*
 void getAcksHelper(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	TcpMessage ack;
 	while (keepGettingAcks) {
@@ -59,7 +63,9 @@ void getAcksHelper(int sockfd, sockaddr_in *si_other, socklen_t len) {
 		}
 	}
 }
+*/
 
+/*
 // Receive ACKs for 0.5 seconds and returns the latest ACK received
 void getAcks(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	chrono::milliseconds timer(TIMEOUT);
@@ -68,6 +74,46 @@ void getAcks(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	future<void> promise = async(launch::async, getAcksHelper, sockfd, si_other, len);
 	promise.wait_for(timer); // run for 0.5s
 	keepGettingAcks = false;
+}
+*/
+
+int getAcks(int sockfd, sockaddr_in *si_other, socklen_t len) {
+	// find the oldest ACK we are waiting for
+	uint16_t oldestSeq = BAD_SEQ_NUM;
+	timeval oldestTimeval = now();
+	for (auto i : packetsInWindow) {
+		uint16_t currSeq = i.first;
+		// this packet is older
+		if (timeval_cmp(timestamps[currSeq], oldestTimeval)) {
+			oldestSeq = currSeq;
+			oldestTimeval = timestamps[currSeq];
+		}
+	}
+	cerr << "oldest seq = " << oldestSeq << endl;
+
+	// if this packet already timed out, just return
+	timeval remaining = timeRemaining(oldestTimeval);
+	if (remaining.tv_sec == 0 && remaining.tv_usec == 0) {
+		timedOutSeq = oldestSeq;
+		return RECV_TIMED_OUT_ALREADY;
+	}
+
+	// try to recv until this packet times out
+	setSocketTimeout(sockfd, timeRemaining(oldestTimeval));
+
+	TcpMessage ack;
+	int r = ack.recvfrom(sockfd, si_other, len);
+	if (r == RECV_SUCCESS) {
+		printRecv("ACK", ack.ackNum);
+		ack.dump();
+		lastAckRecvd = ack.ackNum;
+		clientRecvWindow = ack.recvWindow;
+		return RECV_SUCCESS;
+	}
+	else { // RECV_TIMEOUT
+		timedOutSeq = oldestSeq;
+		return RECV_TIMEOUT;
+	}
 }
 
 
@@ -223,7 +269,6 @@ int main(int argc, char **argv) {
 	// increment our sequence number by 1
 	seqToSend = incSeqNum(seqToSend, 1);
 
-	unordered_map<uint16_t, TcpMessage> packetsInWindow; // seqNum => TcpMessage
 	double cwnd = DATA_SIZE;
 	uint16_t cwndBot = seqToSend;
 	uint16_t cwndTop = seqToSend + cwnd;
@@ -231,7 +276,7 @@ int main(int argc, char **argv) {
 	uint16_t ssThresh = INIT_RECV_WINDOW;
 	int filepkts = 0;
 
-	uint16_t lastAckExpected = 54321; // initialize to some impossible value
+	uint16_t lastAckExpected = BAD_SEQ_NUM;
 	lastAckRecvd = seqToSend;
 
 
@@ -259,9 +304,9 @@ int main(int argc, char **argv) {
 
 		// create new packets
 		uint16_t seqToSendEnd = incSeqNum(seqToSend, DATA_SIZE);
+		// stop if next packet will be outside rwnd or cwnd
 		while (inWindow(seqToSendEnd, rwndBot, rwndTop) &&
-			   inWindow(seqToSendEnd, cwndBot, cwndTop) &&
-			   lastAckExpected == 54321) {
+			   inWindow(seqToSendEnd, cwndBot, cwndTop)) {
 
 			memset(filebuf, 0, DATA_SIZE);
 			wantedFile.read(filebuf, DATA_SIZE);
@@ -269,16 +314,11 @@ int main(int argc, char **argv) {
 			toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, "A");
 			toSend.data = string(filebuf, dataSize);
 
-			// no more data; this packet's seq should be the last ACK
-			if (dataSize == 0) {
-				lastAckExpected = seqToSend;
-				break;
-			}
-
 			// if already in map, we're retransmitting
 			bool isRetransmit = packetsInWindow.count(toSend.seqNum);
 			// store packet in case retransmission needed
 			packetsInWindow[toSend.seqNum] = toSend;
+			timestamps[toSend.seqNum] = now();
 
 			printSend("data", toSend.seqNum, cwnd, ssThresh, isRetransmit);
 			cerr << "sending packet " << filepkts << " of file: " << endl;
@@ -288,21 +328,58 @@ int main(int argc, char **argv) {
 
 			seqToSend = incSeqNum(seqToSend, dataSize);
 			seqToSendEnd = incSeqNum(seqToSend, DATA_SIZE);
+
+			// no more data; this packet's seq should be the last ACK
+			if (dataSize == 0) {
+				lastAckExpected = seqToSend;
+				break;
+			}
 		}
 
-	    getAcks(sockfd, &other, other_length);
+	    int r = getAcks(sockfd, &other, other_length);
+
+		// a old packet timed out; resend it
+		if (r == RECV_TIMED_OUT_ALREADY) {
+			// no packets in window
+			if (timedOutSeq == BAD_SEQ_NUM) {
+				cerr << "!!!!!!!!!!!! no packets in window" << endl;
+			}
+
+			cerr << "retransmit (timed out already)" << endl;
+			packetsInWindow[timedOutSeq].dump();
+			packetsInWindow[timedOutSeq].sendto(sockfd, &other, other_length);
+			timestamps[timedOutSeq] = now();
+		}
 
 		// no ACK received
-		if (getAckTimedOut) {
-			// retransmit oldest data packet
+		else if (r == RECV_TIMEOUT) {
+			// retransmit last ACKed packet
+
+			/*
+			// no packets in window
+			if (timedOutSeq == BAD_SEQ_NUM) {
+				cerr << "!!!!!!!!!!!! no packets in window" << endl;
+			}
+
+			cerr << "retransmit" << endl;
+			packetsInWindow[timedOutSeq].dump();
+			packetsInWindow[timedOutSeq].sendto(sockfd, &other, other_length);
+			timestamps[timedOutSeq] = now();
+			*/
+
 			if (packetsInWindow.count(lastAckRecvd) == 0) {
 				cerr << "!!!!! packet not in window: " << lastAckRecvd << endl;
 				cerr << "!!!!! should never reach this" << endl;
+				for (auto i : packetsInWindow) {
+					cerr << i.first << " ";
+				}
+				cerr << endl;
 				continue;
 			}
-			cerr << "retransmitting" << endl;
+			cerr << "retransmitting (timeout)" << endl;
 			packetsInWindow[lastAckRecvd].dump();
 			packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
+			timestamps[lastAckRecvd] = now();
 
 			// update congestion control
 			ssThresh = cwnd / 2;
@@ -318,12 +395,23 @@ int main(int argc, char **argv) {
 				break;
 			}
 
+			// check if all packets in window were cumulatively ACKed
+			if (lastAckRecvd == seqToSend) {
+				cerr << "!!!!!!!!! all packets ACKed" << endl;
+			}
+
 			// update congestion control
 			if (useSlowStart) {
 				cwnd = cwnd + DATA_SIZE;
+				if (cwnd > clientRecvWindow) {
+					cwnd = clientRecvWindow;
+				}
 			}
 			else {
 				cwnd = cwnd + DATA_SIZE/cwnd;
+				if (cwnd > clientRecvWindow) {
+					cwnd = clientRecvWindow;
+				}
 			}
 		}
 	}
@@ -333,6 +421,12 @@ int main(int argc, char **argv) {
 
 
 	/* FIN */
+
+	// reset to 0.5s timeout
+	timeval recvTimeval;
+	recvTimeval.tv_sec = 0;
+	recvTimeval.tv_usec = TIMEOUT * 1000;
+	setSocketTimeout(sockfd, recvTimeval);
 
 	bool hasReceivedFin = false;
 	bool hasReceivedFinAck = false;
