@@ -378,6 +378,9 @@ int main(int argc, char **argv) {
 					cerr << i.first << " ";
 				}
 				cerr << endl;
+				if (packetsInWindow.size() == 0) {
+					cerr << "packetsInWindow is empty!" << endl;
+				}
 				continue;
 			}
 			cerr << "retransmitting (timeout)" << endl;
@@ -387,6 +390,9 @@ int main(int argc, char **argv) {
 
 			// update congestion control
 			ssThresh = cwnd / 2;
+			if (ssThresh < DATA_SIZE) {
+				ssThresh = DATA_SIZE;
+			}
 			cwnd = DATA_SIZE;
 			useSlowStart = true;
 		}
@@ -407,15 +413,12 @@ int main(int argc, char **argv) {
 			// update congestion control
 			if (useSlowStart) {
 				cwnd = cwnd + DATA_SIZE;
-				if (cwnd > clientRecvWindow) {
-					cwnd = clientRecvWindow;
-				}
 			}
 			else {
 				cwnd = cwnd + DATA_SIZE/cwnd;
-				if (cwnd > clientRecvWindow) {
-					cwnd = clientRecvWindow;
-				}
+			}
+			if (cwnd > clientRecvWindow) {
+				cwnd = clientRecvWindow;
 			}
 		}
 	}
