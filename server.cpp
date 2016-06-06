@@ -303,7 +303,7 @@ int main(int argc, char **argv) {
 			auto curr = it;
 			it++;
 			uint16_t currSeq = curr->second.seqNum;
-			if (!inWindow(currSeq, rwndBot, rwndTop) && currSeq != seqToSend) {
+			if (!inWindow(currSeq, rwndBot, rwndTop)) {
 				packetsInWindow.erase(curr);
 			}
 		}
@@ -311,8 +311,7 @@ int main(int argc, char **argv) {
 		// create new packets
 		uint16_t seqToSendEnd = incSeqNum(seqToSend, DATA_SIZE);
 		// stop if next packet will be outside rwnd or cwnd
-		while (inWindow(seqToSendEnd, rwndBot, rwndTop) &&
-			   inWindow(seqToSendEnd, cwndBot, cwndTop) &&
+		while (inWindow(seqToSendEnd, cwndBot, cwndTop) &&
 			   lastAckExpected == BAD_SEQ_NUM) {
 
 			memset(filebuf, 0, DATA_SIZE);
