@@ -452,7 +452,7 @@ int main(int argc, char **argv) {
 			ackToSend = 0; // ACK is invalid this packet
 			toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 			toSend.sendto(sockfd, &other, other_length);
-			printSend("FIN", seqToSend, DATA_SIZE, ssThresh);
+			printSend("FIN", seqToSend, DATA_SIZE, ssThresh, false);
 			cerr << "Sending FIN\n";
 			toSend.dump();
 		}
@@ -473,15 +473,13 @@ int main(int argc, char **argv) {
 			// FIN-ACK
 			case FIN_FLAG | ACK_FLAG:
 				// TODO: success
-				printRecv("FIN-ACK", received.ackNum);
+				printRecv("FIN", received.ackNum);
 				cerr << "Received FIN-ACK\n";
 				hasReceivedFinAck = true;
 				break;
 
 			// FIN
 			case FIN_FLAG:
-				hasReceivedFinAck = true; // assume that client got a FIN
-				hasReceivedFin = true;
 				printRecv("FIN", received.ackNum);
 				cerr << "Received FIN\n";
 
@@ -490,10 +488,12 @@ int main(int argc, char **argv) {
 				ackToSend = incSeqNum(received.seqNum, 1); // increase ack by 1
 				toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 				toSend.sendto(sockfd, &other, other_length);
-				printSend("FIN", seqToSend, DATA_SIZE, ssThresh);
+				printSend("FIN", seqToSend, DATA_SIZE, ssThresh, hasReceivedFin);
 				cerr << "Sending ACK of FIN\n";
 				toSend.dump();
 				cerr << "Server received FIN; starting timed wait..." << endl;
+				hasReceivedFinAck = true; // assume that client got a FIN
+				hasReceivedFin = true;
 				break;
 
 			default:
