@@ -8,7 +8,7 @@
 #include <netdb.h>
 #include <chrono>
 #include <future>
-#include <deque>
+#include <unordered_map>
 
 #include "Utils.h"
 #include "TcpMessage.h"
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 	TcpMessage dataAck;
 
 	// store the out-of-order packets in case we get in order packets
-	deque<TcpMessage> outOfOrderPkts;
+	unordered_map<uint16_t, TcpMessage> outOfOrderPkts; // seqNum -> TcpMessage
 	// first data packet's sequence number we should receive
 	uint16_t nextInOrderSeq = ackToSend;
 	bool handshakeAckResend = false;
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 
 		// FIN received
 		if (packetReceived.getFlag('F')) {
-			cerr << "OoO deque size at FIN: " << outOfOrderPkts.size() << '\n';
+			cerr << "OoO map size at FIN: " << outOfOrderPkts.size() << '\n';
 			printRecv("FIN", packetReceived.seqNum);
 			break;
 		}
@@ -234,82 +234,27 @@ int main(int argc, char **argv)
 				outFile.write(data, dataSize);
 
 				// see if we received an OoO pkt earlier w/ this seq #
-				for (unsigned i = 0; i < outOfOrderPkts.size(); i++) {
-					// delete from deque; should only be one copy since we check for duplicates when we initially get the OoO pkt
-					if (outOfOrderPkts[i].seqNum == seqReceived) {
-						cerr << "Pkt w/ seq # " << seqReceived << " received in order, delete copy from OoO deque\n";
-						outOfOrderPkts.erase(outOfOrderPkts.begin() + i);
-						break;
-					}
+				if (outOfOrderPkts.count(seqReceived)) {
+					// delete it from map
+					outOfOrderPkts.erase(seqReceived);
 				}
 				// update the next expected sequence number, increase by data size we got
 				nextInOrderSeq = incSeqNum(nextInOrderSeq, dataSize);
-				streamsize nextDataSize = dataSize;
 				// loop through saved OoO packets to see if they're next in order
-				while (outOfOrderPkts.size()) {
-					uint16_t nextSeq = outOfOrderPkts[0].seqNum;
-					// first packet in deque is the next one! pop it off and keep going
-					if (nextSeq == nextInOrderSeq) {
-						cerr << "Popping OoO packet w/ seq num " << nextSeq << '\n';
-						// get the OoO packet's data and data size, write to disk
-						data = outOfOrderPkts[0].data.c_str();
-						nextDataSize = outOfOrderPkts[0].data.size();
-						outFile.write(data, nextDataSize);
-						// update next expected sequence number
-						nextInOrderSeq = incSeqNum(nextInOrderSeq, nextDataSize);
-						outOfOrderPkts.pop_front();
-					}
-					else {
-						break;
-					}
+				while (outOfOrderPkts.count(nextInOrderSeq)) {
+					cerr << "Writing OoO pkt w/ seq # " << nextInOrderSeq << " from map\n";
+					TcpMessage poppedMsg = outOfOrderPkts[nextInOrderSeq];
+					const char *poppedData = poppedMsg.data.c_str();
+					streamsize poppedDataSize = poppedMsg.data.size();
+					outFile.write(poppedData, poppedDataSize);
+					outOfOrderPkts.erase(nextInOrderSeq);
+					nextInOrderSeq = incSeqNum(nextInOrderSeq, poppedDataSize);
 				}
 			}
 			else {
 				// out of order, store it for later
-				cerr << "Received out of order packet!\n";
-				unsigned currVecSize = outOfOrderPkts.size();
-				// no OoO packets yet
-				if (!currVecSize) {
-					cerr << "OoO list was empty, this is only OoO packet\n";
-					outOfOrderPkts.push_back(packetReceived);
-				}
-				// received packet belongs after all other OoO packets
-				// if its seqNum >= the last packet's seqNum + data size
-				// do this first in case the seq #'s wrapped around
-				else if (seqReceived >= incSeqNum(outOfOrderPkts.back().seqNum, outOfOrderPkts.back().data.size())) {
-					outOfOrderPkts.push_back(packetReceived);
-					cerr << "OoO packet pushed to end of list\n";
-				}
-				// received packet belongs before all other OoO packets
-				// if its seqNum < first packet's seqNum
-				else if (seqReceived < outOfOrderPkts[0].seqNum) {
-					outOfOrderPkts.push_front(packetReceived);
-					cerr << "OoO packet inserted at front of list\n";
-				}
-				// else, received packet belongs in b/w two of the OoO packets
-				else {
-					for (unsigned i = 0; i < currVecSize; i++) {
-						uint16_t currSeq = outOfOrderPkts[i].seqNum;
-						if (seqReceived == currSeq) {
-							// already got this data packet, ignore it
-							cerr << "OoO packet discarded: seqNum " << currSeq << '\n';
-							shouldDropPkt = true;
-							break;
-						}
-					}
-					if (!shouldDropPkt) {
-						for (unsigned i = 1; i < currVecSize; i++) {
-							uint16_t currSeq = outOfOrderPkts[i].seqNum;
-							// received packet's seqNum is >= the first packet's seqNum + data size and < second packet's seqNum
-							// TODO: fix this for case where seq #'s wrap around
-							if (seqReceived >= incSeqNum(outOfOrderPkts[i - 1].seqNum, outOfOrderPkts[i - 1].data.size()) && seqReceived < currSeq) {
-								outOfOrderPkts.insert(outOfOrderPkts.begin() + i, packetReceived);
-								cerr << "OoO packet inserted in middle at pos " << i << '\n';
-								break;
-							}
-						}
-					}
-				}
+				cerr << "Received out of order packet! Writing to map\n";
+				outOfOrderPkts[seqReceived] = packetReceived;
 			}
 		}
 		ackToSend = nextInOrderSeq; 
