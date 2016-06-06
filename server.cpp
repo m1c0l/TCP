@@ -306,7 +306,8 @@ int main(int argc, char **argv) {
 		uint16_t seqToSendEnd = incSeqNum(seqToSend, DATA_SIZE);
 		// stop if next packet will be outside rwnd or cwnd
 		while (inWindow(seqToSendEnd, rwndBot, rwndTop) &&
-			   inWindow(seqToSendEnd, cwndBot, cwndTop)) {
+			   inWindow(seqToSendEnd, cwndBot, cwndTop) &&
+			   lastAckExpected == BAD_SEQ_NUM) {
 
 			memset(filebuf, 0, DATA_SIZE);
 			wantedFile.read(filebuf, DATA_SIZE);
@@ -320,20 +321,23 @@ int main(int argc, char **argv) {
 			packetsInWindow[toSend.seqNum] = toSend;
 			timestamps[toSend.seqNum] = now();
 
-			printSend("data", toSend.seqNum, cwnd, ssThresh, isRetransmit);
-			cerr << "sending packet " << filepkts << " of file: " << endl;
-			toSend.dump();
-			toSend.sendto(sockfd, &other, other_length);
-			filepkts++;
-
 			seqToSend = incSeqNum(seqToSend, dataSize);
 			seqToSendEnd = incSeqNum(seqToSend, DATA_SIZE);
 
+			// send packet
+			if (dataSize > 0) {
+				printSend("data", toSend.seqNum, cwnd, ssThresh, isRetransmit);
+				cerr << "sending packet " << filepkts << " of file: " << endl;
+				toSend.dump();
+				toSend.sendto(sockfd, &other, other_length);
+				filepkts++;
+			}
 			// no more data; this packet's seq should be the last ACK
-			if (dataSize == 0) {
+			else {
 				lastAckExpected = seqToSend;
 				break;
 			}
+
 		}
 
 	    int r = getAcks(sockfd, &other, other_length);
