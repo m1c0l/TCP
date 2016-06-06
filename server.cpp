@@ -45,6 +45,8 @@ bool getAckTimedOut = false;
 unordered_map<uint16_t, TcpMessage> packetsInWindow; // seqNum => TcpMessage
 unordered_map<uint16_t, timeval> timestamps; // seqNum => timestamp
 uint16_t timedOutSeq;
+uint16_t acksInARow = 0;
+uint16_t previousAck = BAD_SEQ_NUM;
 
 /*
 void getAcksHelper(int sockfd, sockaddr_in *si_other, socklen_t len) {
@@ -301,7 +303,7 @@ int main(int argc, char **argv) {
 			auto curr = it;
 			it++;
 			uint16_t currSeq = curr->second.seqNum;
-			if (!inWindow(currSeq, rwndBot, rwndTop)) {
+			if (!inWindow(currSeq, rwndBot, rwndTop) && currSeq != seqToSend) {
 				packetsInWindow.erase(curr);
 			}
 		}
@@ -409,6 +411,31 @@ int main(int argc, char **argv) {
 				break;
 			}
 
+			// fast retransmit
+			if (lastAckRecvd == previousAck) {
+				acksInARow++;
+				if (acksInARow == 4) {
+					cerr << "retransmitting (fast retransmit)" << lastAckRecvd << endl;
+					if (packetsInWindow.count(lastAckRecvd) == 0) {
+						cerr << "!!!!! packet not in window: " << lastAckRecvd << endl;
+						cerr << "!!!!! should never reach this" << endl;
+						for (auto i : packetsInWindow) {
+							cerr << i.first << " ";
+						}
+						cerr << endl;
+						if (packetsInWindow.size() == 0) {
+							cerr << "packetsInWindow is empty!" << endl;
+						}
+						continue;
+					}
+					packetsInWindow[lastAckRecvd].dump();
+					packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
+					timestamps[lastAckRecvd] = now();
+					acksInARow = 0;
+				}
+			}
+			previousAck = lastAckRecvd;
+
 			// check if all packets in window were cumulatively ACKed
 			if (lastAckRecvd == seqToSend) {
 				cerr << "!!!!!!!!! all packets ACKed" << endl;
@@ -423,6 +450,9 @@ int main(int argc, char **argv) {
 			}
 			if (cwnd > clientRecvWindow) {
 				cwnd = clientRecvWindow;
+			}
+			if (cwnd >= ssThresh) {
+				useSlowStart = false;
 			}
 		}
 	}
