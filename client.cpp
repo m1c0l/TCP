@@ -41,7 +41,7 @@ void printSend(string pktType, uint16_t ack, bool isRetransmit) {
 	cout << '\n';
 }
 
-#define OUTPUT_FILE "client-dump" // the file received and saved by the client
+#define OUTPUT_FILE "received.data" // the file received and saved by the client
  
 int main(int argc, char **argv)
 {
@@ -327,7 +327,7 @@ int main(int argc, char **argv)
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
-	printSend("FIN-ACK", ackToSend, false);
+	printSend("FIN", ackToSend, false);
 	cerr << "Sending FIN-ACK to server\n";
 	packetToSend.dump();
 
@@ -347,6 +347,7 @@ int main(int argc, char **argv)
 		if (r == RECV_TIMEOUT) {
 			continue;
 		}
+		printRecv("FIN", packetReceived.seqNum);
 		switch(packetReceived.flags) {
 			// server resends FIN
 			case FIN_FLAG:

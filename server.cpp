@@ -25,9 +25,13 @@ void printRecv(string pktType, uint16_t ack) {
 }
 
 void printSend(string pktType, uint16_t seq, int cwnd, int ssThresh, bool isRetransmit) {
-	cout << "Sending " << pktType << " packet " << seq << " " << cwnd << " " << ssThresh;
+	cout << "Sending data packet " << seq << " " << cwnd << " " << ssThresh;
 	if (isRetransmit) {
 		cout << " Retransmission";
+	}
+	if (pktType != "data") {
+		// SYN or FIN
+		cout << " " << pktType;
 	}
 	cout << '\n';
 }
@@ -164,6 +168,7 @@ int main(int argc, char **argv) {
 	bool sendFile = false;
 	uint16_t seqToSend = rand() % MAX_SEQ_NUM; //The first sync
 	uint16_t ackToSend;
+	uint16_t ssThresh = MAX_SEQ_NUM;
 	ifstream wantedFile;
 	string flagsToSend = "";
 	for (int packetsSent = 0; true; packetsSent++) {
@@ -171,7 +176,7 @@ int main(int argc, char **argv) {
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
 			if (hasReceivedSyn) { // client ACK not received; resend SYN-ACK
-				printSend("SYN-ACK", toSend.seqNum, DATA_SIZE, INIT_RECV_WINDOW, true);
+				printSend("SYN", toSend.seqNum, DATA_SIZE, INIT_RECV_WINDOW, true);
 				toSend.sendto(sockfd, &other, other_length);
 				cerr << "Sending SYN-ACK (retransmit):" << endl;
 				toSend.dump();
@@ -204,7 +209,7 @@ int main(int argc, char **argv) {
 				cerr << "Got another SYN, sending SYN-ACK\n";
 			}
 		    flagsToSend ="SA";
-			printSend("SYN-ACK", seqToSend, DATA_SIZE, INIT_RECV_WINDOW, hasReceivedSyn);
+			printSend("SYN", seqToSend, DATA_SIZE, ssThresh, hasReceivedSyn);
 		    hasReceivedSyn = true;
 
 		    break;
@@ -273,7 +278,6 @@ int main(int argc, char **argv) {
 	uint16_t cwndBot = seqToSend;
 	uint16_t cwndTop = seqToSend + cwnd;
 	bool useSlowStart = true;
-	uint16_t ssThresh = INIT_RECV_WINDOW;
 	int filepkts = 0;
 
 	uint16_t lastAckExpected = BAD_SEQ_NUM;
@@ -448,6 +452,7 @@ int main(int argc, char **argv) {
 			ackToSend = 0; // ACK is invalid this packet
 			toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 			toSend.sendto(sockfd, &other, other_length);
+			printSend("FIN", seqToSend, DATA_SIZE, ssThresh);
 			cerr << "Sending FIN\n";
 			toSend.dump();
 		}
@@ -485,6 +490,7 @@ int main(int argc, char **argv) {
 				ackToSend = incSeqNum(received.seqNum, 1); // increase ack by 1
 				toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 				toSend.sendto(sockfd, &other, other_length);
+				printSend("FIN", seqToSend, DATA_SIZE, ssThresh);
 				cerr << "Sending ACK of FIN\n";
 				toSend.dump();
 				cerr << "Server received FIN; starting timed wait..." << endl;
