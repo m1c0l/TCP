@@ -76,5 +76,22 @@ timeval timeRemaining(timeval start) {
 
 	timeval result;
 	timeval_subtract(&result, &end, &n);
+	// make result nonzero (0 => no timeout)
+	if (result.tv_sec == 0 && result.tv_usec == 0) {
+		result.tv_usec = 1;
+	}
 	return result;
+}
+
+// returns true if a comes earlier than b
+bool timeval_cmp(timeval a, timeval b) {
+	if (a.tv_sec < b.tv_sec) {
+		return true;
+	}
+	else if (a.tv_sec > b.tv_sec) {
+		return false;
+	}
+	else {
+		return a.tv_usec < b.tv_usec;
+	}
 }

@@ -12,9 +12,9 @@ using namespace std;
 
 struct TcpMessage {
 public:
-	uint16_t seqNum = 55555;
-	uint16_t ackNum = 55555;
-	uint16_t recvWindow = 1034; //Double check this
+	uint16_t seqNum = BAD_SEQ_NUM;
+	uint16_t ackNum = BAD_SEQ_NUM;
+	uint16_t recvWindow = INIT_RECV_WINDOW;
 	uint16_t flags = 0;
 	string data = "";
 

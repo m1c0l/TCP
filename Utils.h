@@ -21,10 +21,13 @@ const int RECV_TIMEOUT = 2;
 const int TIMEOUT = 500; // milliseconds
 const int MAX_SEG_LIFETIME = 60 * 1000; // milliseconds
 
+const uint16_t BAD_SEQ_NUM = 55555;
+
 uint16_t incSeqNum(uint16_t seq, uint16_t increment);
 bool inWindow(uint16_t seq, uint16_t bot, uint16_t top);
 void setSocketTimeout(int sockfd, timeval tv);
 timeval now();
 timeval timeRemaining(timeval start);
+bool timeval_cmp(timeval a, timeval b);
 
 #endif
