@@ -232,6 +232,16 @@ int main(int argc, char **argv)
 				// save data to file
 				const char *data = packetReceived.data.c_str();
 				outFile.write(data, dataSize);
+
+				// see if we received an OoO pkt earlier w/ this seq #
+				for (unsigned i = 0; i < outOfOrderPkts.size(); i++) {
+					// delete from deque; should only be one copy since we check for duplicates when we initially get the OoO pkt
+					if (outOfOrderPkts[i].seqNum == seqReceived) {
+						cerr << "Pkt w/ seq # " << seqReceived << " received in order, delete copy from OoO deque\n";
+						outOfOrderPkts.erase(outOfOrderPkts.begin() + i);
+						break;
+					}
+				}
 				// update the next expected sequence number, increase by data size we got
 				nextInOrderSeq = incSeqNum(nextInOrderSeq, dataSize);
 				streamsize nextDataSize = dataSize;
