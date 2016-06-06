@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
 			if (hasReceivedSyn) { // client ACK not received; resend SYN-ACK
-				printSend("SYN-ACK", toSend.seqNum, 1, INIT_RECV_WINDOW, true);
+				printSend("SYN-ACK", toSend.seqNum, DATA_SIZE, INIT_RECV_WINDOW, true);
 				toSend.sendto(sockfd, &other, other_length);
 				cerr << "Sending SYN-ACK (retransmit):" << endl;
 				toSend.dump();
@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
 				cerr << "Got another SYN, sending SYN-ACK\n";
 			}
 		    flagsToSend ="SA";
-			printSend("SYN-ACK", seqToSend, 1, INIT_RECV_WINDOW, hasReceivedSyn);
+			printSend("SYN-ACK", seqToSend, DATA_SIZE, INIT_RECV_WINDOW, hasReceivedSyn);
 		    hasReceivedSyn = true;
 
 		    break;
