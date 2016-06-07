@@ -29,14 +29,18 @@ int waitFor(future<T>& promise) {
 }
 */
 
-void printRecv(string pktType, uint16_t seq) {
-	cout << "Receiving " << pktType << " packet " << seq << '\n';
+void printRecv(uint16_t seq) {
+	cout << "Receiving packet " << seq << '\n';
 }
 
 void printSend(string pktType, uint16_t ack, bool isRetransmit) {
-	cout << "Sending " << pktType << " packet " << ack;
+	cout << "Sending packet " << ack;
 	if (isRetransmit) {
 		cout << " Retransmission";
+	}
+	if (pktType != "ACK") {
+		// SYN or FIN
+		cout << " " << pktType;
 	}
 	cout << '\n';
 }
@@ -137,7 +141,7 @@ int main(int argc, char **argv)
 			continue; // resend SYN
 		}
 		else {
-			printRecv("SYN-ACK", packetReceived.seqNum);
+			printRecv(packetReceived.seqNum);
 			cerr << "receiving SYN-ACK:" << endl;
 			packetReceived.dump();
 			if (!packetReceived.getFlag('a') || !packetReceived.getFlag('s')) {
@@ -205,10 +209,10 @@ int main(int argc, char **argv)
 		// FIN received
 		if (packetReceived.getFlag('F')) {
 			cerr << "OoO map size at FIN: " << outOfOrderPkts.size() << '\n';
-			printRecv("FIN", packetReceived.seqNum);
+			printRecv(packetReceived.seqNum);
 			break;
 		}
-		printRecv("data", packetReceived.seqNum);
+		printRecv(packetReceived.seqNum);
 
 		streamsize dataSize = packetReceived.data.size();
 		uint16_t seqReceived = packetReceived.seqNum;
@@ -278,16 +282,17 @@ int main(int argc, char **argv)
 	}*/
 
 	/* Send FIN-ACK for the FIN received earlier */
+	bool hasSentFinAck = false;
+	bool hasSentFin = false;
+	bool hasReceivedAck = false; /* receive packets until a FIN-ACK is received from server */
 	// seq # stays same b/c no payload
 	ackToSend = incSeqNum(packetReceived.seqNum, 1);
 	packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
 	packetToSend.sendto(sockfd, &si_server, serverLen);
-	printSend("FIN", ackToSend, false);
+	printSend("FIN", ackToSend, hasSentFinAck);
 	cerr << "Sending FIN-ACK to server\n";
 	packetToSend.dump();
 
-	bool hasSentFin = false;
-	bool hasReceivedAck = false; /* receive packets until a FIN-ACK is received from server */
 	while (!hasReceivedAck) {
 
 		/* Send FIN; seq # stays same b/c no payload */
@@ -302,11 +307,12 @@ int main(int argc, char **argv)
 		if (r == RECV_TIMEOUT) {
 			continue;
 		}
-		printRecv("FIN", packetReceived.seqNum);
+		printRecv(packetReceived.seqNum);
 		switch(packetReceived.flags) {
 			// server resends FIN
 			case FIN_FLAG:
 				/* Send FIN-ACK */
+				printSend("FIN", ackToSend, true);
 				cerr << "Received FIN\n";
 				ackToSend = incSeqNum(packetReceived.seqNum, 1);
 				packetToSend = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "FA");
