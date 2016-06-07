@@ -364,18 +364,6 @@ int main(int argc, char **argv) {
 		else if (r == RECV_TIMEOUT) {
 			// retransmit last ACKed packet
 
-			/*
-			// no packets in window
-			if (timedOutSeq == BAD_SEQ_NUM) {
-				cerr << "!!!!!!!!!!!! no packets in window" << endl;
-			}
-
-			cerr << "retransmit" << endl;
-			packetsInWindow[timedOutSeq].dump();
-			packetsInWindow[timedOutSeq].sendto(sockfd, &other, other_length);
-			timestamps[timedOutSeq] = now();
-			*/
-
 			if (packetsInWindow.count(lastAckRecvd) == 0) {
 				cerr << "!!!!! packet not in window: " << lastAckRecvd << endl;
 				cerr << "!!!!! should never reach this" << endl;
@@ -413,7 +401,7 @@ int main(int argc, char **argv) {
 
 			// fast retransmit
 			if (lastAckRecvd == previousAck) {
-				acksInARow++;
+				acksInARow++; 
 				if (acksInARow == 4) {
 					cerr << "retransmitting (fast retransmit)" << lastAckRecvd << endl;
 					if (packetsInWindow.count(lastAckRecvd) == 0) {
@@ -433,10 +421,14 @@ int main(int argc, char **argv) {
 					packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
 					timestamps[lastAckRecvd] = now();
 					acksInARow = 0;
+					cwnd = cwnd + DATA_SIZE/cwnd;
+					previousAck = lastAckRecvd;
+					continue;
+					
 				}
 			}
 			previousAck = lastAckRecvd;
-
+			
 			// check if all packets in window were cumulatively ACKed
 			if (lastAckRecvd == seqToSend) {
 				cerr << "!!!!!!!!! all packets ACKed" << endl;
