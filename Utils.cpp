@@ -20,7 +20,6 @@ bool inWindow(uint16_t seq, uint16_t bot, uint16_t top) {
 	}
 }
 
-// from GNU docs
 /* Subtract the ‘struct timeval’ values X and Y,
    storing the result in RESULT.
    Return 1 if the difference is negative, otherwise 0. */

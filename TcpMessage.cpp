@@ -33,7 +33,7 @@ bool TcpMessage::setFlag(string flag) {
                 flags |= SYN_FLAG;
                 break;
             default:
-                cerr << "flag parameter must be A, F or S";
+                // cerr << "flag parameter must be A, F or S";
                 return false;
         }
     }
@@ -52,7 +52,7 @@ bool TcpMessage::getFlag(char flag) {
         case 's':
             return !!(flags & SYN_FLAG);
         default:
-            cerr << "flag parameter must be A, F or S";
+            // cerr << "flag parameter must be A, F or S";
             return false;
     }
 }
@@ -101,7 +101,7 @@ int TcpMessage::recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	int recv_len = ::recvfrom(sockfd, buf, BUFFER_SIZE, 0, (sockaddr*)si_other, &len);
 	if (recv_len == -1) {
 		if (errno == EWOULDBLOCK) {
-			cerr << "timeout\n";
+			// cerr << "timeout\n";
 			return RECV_TIMEOUT;
 		}	
 		perror("recvfrom");
@@ -113,12 +113,12 @@ int TcpMessage::recvfrom(int sockfd, sockaddr_in *si_other, socklen_t len) {
 
 // Print out the TcpMessage's contents
 void TcpMessage::dump() {
-	cerr << "seqNum = " << seqNum << '\t';
-	cerr << "ackNum = " << ackNum << '\t';
-	cerr << "recvWindow = " << recvWindow << endl;
-	cerr << "FIN_FLAG = " << getFlag('f') << '\t';
-	cerr << "SYN_FLAG = " << getFlag('s') << '\t';
-	cerr << "ACK_FLAG = " << getFlag('a') << endl;
-	cerr << "data.size() = " << data.size() << endl;
-	cerr << endl;
+	// cerr << "seqNum = " << seqNum << '\t';
+	// cerr << "ackNum = " << ackNum << '\t';
+	// cerr << "recvWindow = " << recvWindow << endl;
+	// cerr << "FIN_FLAG = " << getFlag('f') << '\t';
+	// cerr << "SYN_FLAG = " << getFlag('s') << '\t';
+	// cerr << "ACK_FLAG = " << getFlag('a') << endl;
+	// cerr << "data.size() = " << data.size() << endl;
+	// cerr << endl;
 }

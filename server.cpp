@@ -48,40 +48,6 @@ uint16_t timedOutSeq;
 uint16_t acksInARow = 0;
 uint16_t previousAck = BAD_SEQ_NUM;
 
-/*
-void getAcksHelper(int sockfd, sockaddr_in *si_other, socklen_t len) {
-	TcpMessage ack;
-	while (keepGettingAcks) {
-		if (ack.recvfrom(sockfd, si_other, len) == RECV_SUCCESS) {
-			getAckTimedOut = false;
-			printRecv("ACK", ack.ackNum);
-			ack.dump();
-			lastAckRecvd = ack.ackNum;
-			clientRecvWindow = ack.recvWindow;
-			uint16_t start = incSeqNum(rwndBot, 1);
-			uint16_t end = incSeqNum(rwndTop, DATA_SIZE);
-			if (inWindow(lastAckRecvd, start, end)) {
-				return; // new ACK received for something in receiver window
-			}
-		}
-		else {
-			cerr << "no ACK received" << endl;
-		}
-	}
-}
-*/
-
-/*
-// Receive ACKs for 0.5 seconds and returns the latest ACK received
-void getAcks(int sockfd, sockaddr_in *si_other, socklen_t len) {
-	chrono::milliseconds timer(TIMEOUT);
-	keepGettingAcks = true;
-	getAckTimedOut = true;;
-	future<void> promise = async(launch::async, getAcksHelper, sockfd, si_other, len);
-	promise.wait_for(timer); // run for 0.5s
-	keepGettingAcks = false;
-}
-*/
 
 int getAcks(int sockfd, sockaddr_in *si_other, socklen_t len) {
 	// find the oldest ACK we are waiting for
@@ -95,7 +61,7 @@ int getAcks(int sockfd, sockaddr_in *si_other, socklen_t len) {
 			oldestTimeval = timestamps[currSeq];
 		}
 	}
-	cerr << "oldest seq = " << oldestSeq << endl;
+	// cerr << "oldest seq = " << oldestSeq << endl;
 
 	// if this packet already timed out, just return
 	timeval remaining = timeRemaining(oldestTimeval);
@@ -130,7 +96,6 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	//We probably need default values, not sure what they are yet.
 	string port = argv[1];
 	string filename = argv[2];
 
@@ -174,20 +139,20 @@ int main(int argc, char **argv) {
 	ifstream wantedFile;
 	string flagsToSend = "";
 	for (int packetsSent = 0; true; packetsSent++) {
-	    cerr << "Waiting for something" << endl;
+	    // cerr << "Waiting for something" << endl;
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
 			if (hasReceivedSyn) { // client ACK not received; resend SYN-ACK
 				printSend("SYN", toSend.seqNum, DATA_SIZE, DATA_SIZE, true);
 				toSend.sendto(sockfd, &other, other_length);
-				cerr << "Sending SYN-ACK (retransmit):" << endl;
+				// cerr << "Sending SYN-ACK (retransmit):" << endl;
 				toSend.dump();
 			}
 			continue;
 		}
 
-		cerr << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
-		cerr << "Received:" << endl;
+		// cerr << "Packet arrived from" << inet_ntoa(addr.sin_addr)<< ": " << ntohs(other.sin_port) << endl;
+		// cerr << "Received:" << endl;
 		received.dump();
 
 		clientRecvWindow = received.recvWindow;
@@ -208,7 +173,7 @@ int main(int argc, char **argv) {
 		case SYN_FLAG:
 			printRecv(received.ackNum);
 		    if (hasReceivedSyn) {
-				cerr << "Got another SYN, sending SYN-ACK\n";
+				// cerr << "Got another SYN, sending SYN-ACK\n";
 			}
 		    flagsToSend ="SA";
 			printSend("SYN", seqToSend, DATA_SIZE, DATA_SIZE, hasReceivedSyn);
@@ -217,16 +182,14 @@ int main(int argc, char **argv) {
 		    break;
 
 		case SYN_FLAG | ACK_FLAG:
-		    cerr << "Both SYN and ACK were set by client\n";
-			// TODO: should we deal with this case?
+		    // cerr << "Both SYN and ACK were set by client\n";
 		    //exit(1);
 		    break;
 
 		case ACK_FLAG:
 			printRecv(received.ackNum);
 		    if (!hasReceivedSyn) {
-				// TODO: think about this case more
-				cerr << "ACK before handshake\n";
+				// cerr << "ACK before handshake\n";
 				break;
 			}
 		    flagsToSend = "A";
@@ -236,7 +199,7 @@ int main(int argc, char **argv) {
 		    break;
 
 		default:
-		    cerr << "Incorrect flags set\n";
+		    // cerr << "Incorrect flags set\n";
 		    break;
 		}
 
@@ -248,11 +211,9 @@ int main(int argc, char **argv) {
 		ackToSend = incSeqNum(received.seqNum, 1);
 		toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 		toSend.sendto(sockfd, &other, other_length);
-		cerr << "Handshake: sending packet\n";
+		// cerr << "Handshake: sending packet\n";
 		toSend.dump();
 	}
-
-	//return 0;
 
 	char filebuf[DATA_SIZE];
 	wantedFile.open(filename);
@@ -260,15 +221,6 @@ int main(int argc, char **argv) {
 		perror("fstream open");
 		exit(1);
 	}
-
-	/*
-	off_t bodyLength = 0;
-	struct stat st; // of course C names a class and function the same thing...
-	if (stat(filename.c_str(), &st) == -1) {
-		perror("stat");
-	}
-	bodyLength = st.st_size;
-	*/
 
 	// if the client sent data, increment ack by that number
 	size_t recvLength = received.data.length();
@@ -332,7 +284,7 @@ int main(int argc, char **argv) {
 			// send packet
 			if (dataSize > 0) {
 				printSend("data", toSend.seqNum, cwnd, ssThresh, isRetransmit);
-				cerr << "sending packet " << filepkts << " of file: " << endl;
+				// cerr << "sending packet " << filepkts << " of file: " << endl;
 				toSend.dump();
 				toSend.sendto(sockfd, &other, other_length);
 				filepkts++;
@@ -351,10 +303,10 @@ int main(int argc, char **argv) {
 		if (r == RECV_TIMED_OUT_ALREADY) {
 			// no packets in window
 			if (timedOutSeq == BAD_SEQ_NUM) {
-				cerr << "!!!!!!!!!!!! no packets in window" << endl;
+				// cerr << "!!!!!!!!!!!! no packets in window" << endl;
 			}
 
-			cerr << "retransmit (timed out already)" << endl;
+			// cerr << "retransmit (timed out already)" << endl;
 			packetsInWindow[timedOutSeq].dump();
 			packetsInWindow[timedOutSeq].sendto(sockfd, &other, other_length);
 			timestamps[timedOutSeq] = now();
@@ -363,20 +315,19 @@ int main(int argc, char **argv) {
 		// no ACK received
 		else if (r == RECV_TIMEOUT) {
 			// retransmit last ACKed packet
-
 			if (packetsInWindow.count(lastAckRecvd) == 0) {
-				cerr << "!!!!! packet not in window: " << lastAckRecvd << endl;
-				cerr << "!!!!! should never reach this" << endl;
+				// cerr << "!!!!! packet not in window: " << lastAckRecvd << endl;
+				// cerr << "!!!!! should never reach this" << endl;
 				for (auto i : packetsInWindow) {
-					cerr << i.first << " ";
+					// cerr << i.first << " ";
 				}
-				cerr << endl;
+				// cerr << endl;
 				if (packetsInWindow.size() == 0) {
-					cerr << "packetsInWindow is empty!" << endl;
+					// cerr << "packetsInWindow is empty!" << endl;
 				}
 				continue;
 			}
-			cerr << "retransmitting (timeout)" << endl;
+			// cerr << "retransmitting (timeout)" << endl;
 			printSend("data", packetsInWindow[lastAckRecvd].seqNum, cwnd, ssThresh, true);
 			packetsInWindow[lastAckRecvd].dump();
 			packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
@@ -403,16 +354,16 @@ int main(int argc, char **argv) {
 			if (lastAckRecvd == previousAck) {
 				acksInARow++; 
 				if (acksInARow == 4) {
-					cerr << "retransmitting (fast retransmit)" << lastAckRecvd << endl;
+					// cerr << "retransmitting (fast retransmit)" << lastAckRecvd << endl;
 					if (packetsInWindow.count(lastAckRecvd) == 0) {
-						cerr << "!!!!! packet not in window: " << lastAckRecvd << endl;
-						cerr << "!!!!! should never reach this" << endl;
+						// cerr << "!!!!! packet not in window: " << lastAckRecvd << endl;
+						// cerr << "!!!!! should never reach this" << endl;
 						for (auto i : packetsInWindow) {
-							cerr << i.first << " ";
+							// cerr << i.first << " ";
 						}
-						cerr << endl;
+						// cerr << endl;
 						if (packetsInWindow.size() == 0) {
-							cerr << "packetsInWindow is empty!" << endl;
+							// cerr << "packetsInWindow is empty!" << endl;
 						}
 						continue;
 					}
@@ -431,7 +382,7 @@ int main(int argc, char **argv) {
 			
 			// check if all packets in window were cumulatively ACKed
 			if (lastAckRecvd == seqToSend) {
-				cerr << "!!!!!!!!! all packets ACKed" << endl;
+				// cerr << "!!!!!!!!! all packets ACKed" << endl;
 			}
 
 			// update congestion control
@@ -451,7 +402,7 @@ int main(int argc, char **argv) {
 	}
 
 
-	cerr << "out of loop\n";
+	// cerr << "out of loop\n";
 
 
 	/* FIN */
@@ -478,7 +429,7 @@ int main(int argc, char **argv) {
 			toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 			toSend.sendto(sockfd, &other, other_length);
 			printSend("FIN", seqToSend, DATA_SIZE, ssThresh, hasSentFin);
-			cerr << "Sending FIN\n";
+			// cerr << "Sending FIN\n";
 			toSend.dump();
 			hasSentFin = true;
 		}
@@ -490,7 +441,7 @@ int main(int argc, char **argv) {
 
 		int r = received.recvfrom(sockfd, &other, other_length);
 		if (r == RECV_TIMEOUT) {
-			cerr << "Timeout while waiting for FIN-ACK/FIN\n";
+			// cerr << "Timeout while waiting for FIN-ACK/FIN\n";
 			continue;
 		}
 		clientRecvWindow = received.recvWindow;
@@ -498,16 +449,15 @@ int main(int argc, char **argv) {
 		switch(received.flags) {
 			// FIN-ACK
 			case FIN_FLAG | ACK_FLAG:
-				// TODO: success
 				printRecv(received.ackNum);
-				cerr << "Received FIN-ACK\n";
+				// cerr << "Received FIN-ACK\n";
 				hasReceivedFinAck = true;
 				break;
 
 			// FIN
 			case FIN_FLAG:
 				printRecv(received.ackNum);
-				cerr << "Received FIN\n";
+				// cerr << "Received FIN\n";
 
 				flagsToSend = "A";// this is "FIN-ACK" but without FIN flag
 				seqToSend = incSeqNum(seqToSend, 1);// increase sequence number by 1
@@ -515,22 +465,23 @@ int main(int argc, char **argv) {
 				toSend = TcpMessage(seqToSend, ackToSend, clientRecvWindow, flagsToSend);
 				toSend.sendto(sockfd, &other, other_length);
 				printSend("data", seqToSend, DATA_SIZE, ssThresh, hasSentAckFin);
-				cerr << "Sending ACK of FIN\n";
+				// cerr << "Sending ACK of FIN\n";
 				toSend.dump();
-				cerr << "Server received FIN; starting timed wait..." << endl;
+				// cerr << "Server received FIN; starting timed wait..." << endl;
 				hasReceivedFinAck = true; // assume that client got a FIN
 				hasReceivedFin = true;
 				hasSentAckFin = true;
 				break;
 
 			default:
-				cerr << "Received packet wasn't FIN-ACK or FIN!\n";
+				// cerr << "Received packet wasn't FIN-ACK or FIN!\n";
 				//exit(1);
+				break;
 		}
 		received.dump();
 	}
 
-	cerr << "Shouldn't receive anything else from client now\n";
+	// cerr << "Shouldn't receive anything else from client now\n";
 
 	close(sockfd);
 	return 0;
