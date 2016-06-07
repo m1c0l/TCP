@@ -372,7 +372,11 @@ int main(int argc, char **argv) {
 					packetsInWindow[lastAckRecvd].sendto(sockfd, &other, other_length);
 					timestamps[lastAckRecvd] = now();
 					acksInARow = 0;
-					cwnd = cwnd + DATA_SIZE/cwnd;
+					//fast recovery
+					//should actually be same logic as timeout retransmit, just without setting useSlowStart
+					ssThresh = (cwnd/2 < DATA_SIZE) ? DATA_SIZE : cwnd/2;
+					cwnd = ssThresh > cleintRecvWindow ? clientRecvWindow : ssThresh;
+					useSlowStart = false;
 					previousAck = lastAckRecvd;
 					continue;
 					
