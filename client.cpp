@@ -21,7 +21,10 @@ void printRecv(uint16_t seq) {
 }
 
 void printSend(string pktType, uint16_t ack, bool isRetransmit) {
-	cout << "Sending packet " << ack;
+	cout << "Sending packet";
+	if (pktType != "SYN") {
+   		cout << " " << ack;
+	}
 	if (isRetransmit) {
 		cout << " Retransmission";
 	}
@@ -163,13 +166,15 @@ int main(int argc, char **argv)
 	unordered_map<uint16_t, TcpMessage> outOfOrderPkts; // seqNum -> TcpMessage
 	// first data packet's sequence number we should receive
 	uint16_t nextInOrderSeq = ackToSend;
+	uint16_t lastAckSent = BAD_SEQ_NUM;
 	bool handshakeAckResend = false;
 
 	while (true) {
 		/* send handshake ACK */
 		if (!handshakeComplete) {
 			packetToSend = TcpMessage(handshakeSeq, handshakeAck, recvWindowToSend, "A");
-			printSend("ACK", seqToSend, handshakeAckResend);
+			printSend("ACK", handshakeAck, handshakeAckResend);
+			lastAckSent = handshakeAck;
 			// cerr << "sending ACK:" << endl;
 			packetToSend.dump();
 			packetToSend.sendto(sockfd, &si_server, serverLen);
@@ -249,10 +254,11 @@ int main(int argc, char **argv)
 		}
 		ackToSend = nextInOrderSeq; 
 		dataAck = TcpMessage(seqToSend, ackToSend, recvWindowToSend, "A");
-		printSend("ACK", ackToSend, shouldDropPkt);
+		printSend("ACK", ackToSend, ackToSend == lastAckSent);
 		// cerr << "sending ACK:" << endl;
 		dataAck.dump();
 		dataAck.sendto(sockfd, &si_server, serverLen);
+		lastAckSent = ackToSend;
 	}
 
  

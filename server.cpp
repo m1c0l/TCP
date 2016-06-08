@@ -375,7 +375,7 @@ int main(int argc, char **argv) {
 					//fast recovery
 					//should actually be same logic as timeout retransmit, just without setting useSlowStart
 					ssThresh = (cwnd/2 < DATA_SIZE) ? DATA_SIZE : cwnd/2;
-					cwnd = ssThresh > cleintRecvWindow ? clientRecvWindow : ssThresh;
+					cwnd = ssThresh > clientRecvWindow ? clientRecvWindow : ssThresh;
 					useSlowStart = false;
 					previousAck = lastAckRecvd;
 					continue;
@@ -394,7 +394,7 @@ int main(int argc, char **argv) {
 				cwnd = cwnd + DATA_SIZE;
 			}
 			else {
-				cwnd = cwnd + DATA_SIZE/cwnd;
+				cwnd = cwnd + DATA_SIZE * DATA_SIZE /cwnd;
 			}
 			if (cwnd > clientRecvWindow) {
 				cwnd = clientRecvWindow;
