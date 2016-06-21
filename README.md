@@ -1,16 +1,11 @@
-# CS118 Project 2
+# TCP
 
-Template for for [CS118 Spring 2016 Project 2](http://web.cs.ucla.edu/classes/spring16/cs118/project-2.html) 
+This project created a TCP server and client on two different Vagrant virtual machines. The server and client send packets over UDP sockets, and the TCP features include flow control (through the client's receiver window), congestion control (slow start, congestion avoidance, and Reno fast recovery), and packet buffering.
 
-## Makefile
+`vagrant up` initializes the two virtual machines, and the files are located in the `/vagrant` directory in the virtual machines. `make` compiles the client and server to `./client` and `./server` respectively. These are used as follows:
 
-This provides a couple make targets for things.
-By default (all target), it makes the `server` and `client` executables.
+ `./client SERVER-HOST-OR-IP PORT-NUMBER`
+ 
+`./server PORT-NUMBER FILE-NAME`
 
-It provides a `clean` target, and `tarball` target to create the submission file as well.
-
-You will need to modify the `Makefile` to add your userid for the `.tar.gz` turn-in at the top of the file.
-
-## Provided Files
-
-`server.cpp` and `client.cpp` are the entry points for the server and client part of the project.
+The server is set up to wait until the client sets up a connection to it (IP is 10.0.0.3), and sends a file specified in the command line argument over 1032 byte packets to the client. 
